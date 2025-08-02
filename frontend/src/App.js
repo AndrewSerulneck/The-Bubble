@@ -25,12 +25,8 @@ const App = () => {
   const loadKnowledgeGraph = async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.append('days', days);
-      if (section) params.append('section', section);
-      params.append('max_articles', '15');
-
-      const response = await fetch(`${backendUrl}/api/knowledge-graph?${params}`);
+      // Use the demo endpoint for reliable data
+      const response = await fetch(`${backendUrl}/api/demo-graph`);
       const data = await response.json();
       
       setGraphData(data);
