@@ -279,40 +279,52 @@ Maximum 3 connections. If no strong connections exist, return []."""
     async def create_engaging_summary(self, story: Dict) -> Dict[str, str]:
         """Use ChatGPT to create engaging summaries and previews"""
         title = story.get("webTitle", "")
-        content = story.get("fields", {}).get("body", "")[:2000]
+        content = story.get("fields", {}).get("body", "")[:1500]  # Reduce content length
         standfirst = story.get("fields", {}).get("standfirst", "")
         
-        summary_prompt = f"""Transform this news story into engaging, accessible content:
+        # Shorter, more focused prompt
+        summary_prompt = f"""Transform this news story:
 
 Title: {title}
-Standfirst: {standfirst}
-Content: {content}
+Content: {content[:800]}
 
-Create:
-1. summary: A compelling 2-3 sentence summary that captures the key points
-2. lede: An engaging opening line that hooks the reader (1 sentence)
-3. nutgraf: A clear explanation of why this story matters (1-2 sentences)
-4. engagement_preview: A social media-ready preview that would make someone want to click (1 sentence, under 280 characters)
-
-Return as JSON:
-{{
-  "summary": "...",
-  "lede": "...", 
-  "nutgraf": "...",
-  "engagement_preview": "..."
-}}"""
+Return JSON:
+{{"summary": "2-3 sentence summary", "lede": "engaging opening line", "nutgraf": "why this matters", "engagement_preview": "social media hook (<280 chars)"}}"""
 
         try:
             user_message = UserMessage(text=summary_prompt)
             response = await self.gpt_chat.send_message(user_message)
             
-            return json.loads(response.strip())
+            # Clean and parse response
+            response_text = response.strip()
+            
+            # Handle non-JSON responses
+            if not response_text.startswith('{'):
+                # Try to extract JSON from response
+                import re
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+                if json_match:
+                    response_text = json_match.group()
+                else:
+                    raise ValueError("No JSON found in response")
+            
+            parsed_response = json.loads(response_text)
+            
+            # Validate required fields
+            required_fields = ["summary", "lede", "nutgraf", "engagement_preview"]
+            for field in required_fields:
+                if field not in parsed_response:
+                    parsed_response[field] = title[:200] if field == "engagement_preview" else title
+            
+            return parsed_response
+            
         except Exception as e:
             print(f"ChatGPT summary error: {e}")
+            # Fallback to basic content extraction
             return {
                 "summary": title,
                 "lede": standfirst or title,
-                "nutgraf": "This story provides important insights into current events.",
+                "nutgraf": "This story covers important developments in current events.",
                 "engagement_preview": title[:280]
             }
 
