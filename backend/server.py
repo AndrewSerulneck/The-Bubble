@@ -167,33 +167,23 @@ class AIAnalyzer:
         self.claude_chat = LlmChat(
             api_key=ANTHROPIC_API_KEY,
             session_id=f"claude-analysis-{uuid.uuid4()}",
-            system_message="""You are an expert news analyst specializing in identifying relationships between news stories. 
-            
-Your task is to analyze news articles and determine:
-1. How stories are connected (causally, thematically, geographically, economically)
-2. Connection strength (0.0 to 1.0 scale)
-3. Type of connection (economic, political, social, environmental, etc.)
-4. Clear explanation of the relationship
+            system_message="""You are a news analyst. Identify meaningful relationships between news stories.
 
-Focus on both obvious connections (like political unrest affecting oil prices) and subtle ones (like elections in one country affecting fashion industry in another).
+Return connections as JSON array ONLY:
+[{"source_id": "id1", "target_id": "id2", "connection_type": "economic|political|social|environmental|causal|thematic", "strength": 0.3-1.0, "explanation": "brief reason", "keywords": ["key1"]}]
 
-Return your analysis as structured JSON."""
-        ).with_model("anthropic", "claude-sonnet-4-20250514")
+If no meaningful connections exist, return []."""
+        ).with_model("anthropic", "claude-sonnet-4-20250514").with_max_tokens(1000)
         
-        # ChatGPT for summaries and engaging content
+        # ChatGPT for summaries and engaging content  
         self.gpt_chat = LlmChat(
             api_key=OPENAI_API_KEY,
             session_id=f"gpt-summaries-{uuid.uuid4()}",
-            system_message="""You are a skilled content creator who transforms news articles into engaging, concise summaries perfect for social media and quick consumption.
+            system_message="""Create engaging news summaries in JSON format:
+{"summary": "2-3 sentences", "lede": "hook line", "nutgraf": "why it matters", "engagement_preview": "social hook <280 chars"}
 
-Create:
-1. Engaging headlines that capture attention
-2. Clear, concise summaries (2-3 sentences)
-3. Compelling lede and nutgraf for news bubbles
-4. Social media-ready previews
-
-Keep content informative but accessible and engaging."""
-        ).with_model("openai", "gpt-4o")
+Keep content concise and engaging."""
+        ).with_model("openai", "gpt-4o").with_max_tokens(800)
     
     async def analyze_story_connections(self, stories: List[Dict]) -> List[StoryConnection]:
         """Use Claude to analyze relationships between stories"""
