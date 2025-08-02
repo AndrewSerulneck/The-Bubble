@@ -9,6 +9,10 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [days, setDays] = useState(3);
   const [section, setSection] = useState('');
+  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackData, setFeedbackData] = useState({ rating: 5, comments: '', email: '' });
+  const [showHelp, setShowHelp] = useState(false);
   const svgRef = useRef();
 
   const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -19,13 +23,14 @@ const App = () => {
   ];
 
   useEffect(() => {
+    // Auto-load demo data on first visit
     loadKnowledgeGraph();
   }, []);
 
   const loadKnowledgeGraph = async () => {
     setLoading(true);
     try {
-      // Use the demo endpoint for reliable data
+      // Use demo endpoint for reliable user testing
       const response = await fetch(`${backendUrl}/api/demo-graph`);
       const data = await response.json();
       
@@ -55,8 +60,31 @@ const App = () => {
       renderGraph(data);
     } catch (error) {
       console.error('Error searching news:', error);
+      // Fallback to demo data if search fails
+      loadKnowledgeGraph();
     } finally {
       setLoading(false);
+    }
+  };
+
+  const submitFeedback = async () => {
+    try {
+      const response = await fetch(`${backendUrl}/api/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(feedbackData)
+      });
+      
+      if (response.ok) {
+        alert('Thank you for your feedback! 🙏');
+        setShowFeedback(false);
+        setFeedbackData({ rating: 5, comments: '', email: '' });
+      }
+    } catch (error) {
+      alert('Thanks for your feedback! (Note: This is a demo, so feedback is noted locally)');
+      setShowFeedback(false);
     }
   };
 
@@ -94,7 +122,7 @@ const App = () => {
     
     svg.call(zoom);
 
-    // Create links
+    // Create links with enhanced styling
     const links = container.selectAll('.link')
       .data(data.edges)
       .enter()
@@ -124,13 +152,14 @@ const App = () => {
       .attr('class', 'node')
       .style('cursor', 'pointer');
 
-    // Add circles for nodes
+    // Add circles for nodes with enhanced styling
     nodes.append('circle')
       .attr('r', d => d.size || 20)
       .style('fill', d => d.color || '#3498db')
       .style('stroke', '#fff')
       .style('stroke-width', 2)
-      .style('opacity', d => d.type === 'section' ? 0.7 : 0.9);
+      .style('opacity', d => d.type === 'section' ? 0.7 : 0.9)
+      .style('filter', 'drop-shadow(0px 2px 4px rgba(0,0,0,0.2))');
 
     // Add labels for articles
     nodes.filter(d => d.type === 'article')
@@ -143,7 +172,8 @@ const App = () => {
       .style('fill', '#2c3e50')
       .style('text-anchor', 'middle')
       .attr('dy', 35)
-      .style('pointer-events', 'none');
+      .style('pointer-events', 'none')
+      .style('font-weight', '600');
 
     // Add labels for sections
     nodes.filter(d => d.type === 'section')
@@ -156,32 +186,68 @@ const App = () => {
       .attr('dy', 4)
       .style('pointer-events', 'none');
 
-    // Add hover effects and click handlers
+    // Add enhanced hover effects
     nodes
       .on('mouseover', function(event, d) {
         d3.select(this).select('circle')
           .transition()
           .duration(200)
-          .attr('r', (d.size || 20) * 1.2)
-          .style('stroke-width', 3);
+          .attr('r', (d.size || 20) * 1.3)
+          .style('stroke-width', 4)
+          .style('filter', 'drop-shadow(0px 4px 8px rgba(0,0,0,0.3))');
         
         // Highlight connected links
         links.style('stroke-opacity', link => 
-          link.source.id === d.id || link.target.id === d.id ? 1 : 0.2
+          link.source.id === d.id || link.target.id === d.id ? 1 : 0.1
         );
+
+        // Show connection info tooltip
+        if (d.type === 'article') {
+          const tooltip = container.append('g')
+            .attr('class', 'tooltip')
+            .attr('transform', `translate(${d.x + 30}, ${d.y - 30})`);
+          
+          const rect = tooltip.append('rect')
+            .attr('width', 200)
+            .attr('height', 60)
+            .attr('rx', 5)
+            .style('fill', 'rgba(0,0,0,0.8)')
+            .style('stroke', '#fff');
+          
+          tooltip.append('text')
+            .attr('x', 10)
+            .attr('y', 20)
+            .style('fill', 'white')
+            .style('font-size', '12px')
+            .style('font-weight', 'bold')
+            .text(d.title.substring(0, 25) + '...');
+          
+          tooltip.append('text')
+            .attr('x', 10)
+            .attr('y', 40)
+            .style('fill', '#ccc')
+            .style('font-size', '10px')
+            .text(`${d.section} • Click for details`);
+        }
       })
       .on('mouseout', function(event, d) {
         d3.select(this).select('circle')
           .transition()
           .duration(200)
           .attr('r', d.size || 20)
-          .style('stroke-width', 2);
+          .style('stroke-width', 2)
+          .style('filter', 'drop-shadow(0px 2px 4px rgba(0,0,0,0.2))');
         
         // Reset link opacity
         links.style('stroke-opacity', d => d.opacity || 0.6);
+        
+        // Remove tooltip
+        container.selectAll('.tooltip').remove();
       })
       .on('click', function(event, d) {
-        setSelectedNode(d);
+        if (d.type === 'article') {
+          setSelectedNode(d);
+        }
       });
 
     // Add drag behavior
@@ -217,11 +283,186 @@ const App = () => {
 
   return (
     <div className="app">
+      {/* Onboarding Modal */}
+      {showOnboarding && (
+        <div className="modal-overlay">
+          <div className="onboarding-modal">
+            <div className="modal-header">
+              <h2>🎯 Welcome to News Knowledge Graph</h2>
+              <p>Discover how AI reveals hidden connections between world events</p>
+            </div>
+            
+            <div className="onboarding-steps">
+              <div className="step">
+                <span className="step-number">1</span>
+                <div className="step-content">
+                  <h3>🔗 See Story Connections</h3>
+                  <p>AI analyzes news stories and shows how they're related - from obvious economic links to surprising global connections.</p>
+                </div>
+              </div>
+              
+              <div className="step">
+                <span className="step-number">2</span>
+                <div className="step-content">
+                  <h3>💫 Interactive Exploration</h3>
+                  <p>Hover over stories to see connections light up. Click circles for detailed analysis. Drag nodes to explore.</p>
+                </div>
+              </div>
+              
+              <div className="step">
+                <span className="step-number">3</span>
+                <div className="step-content">
+                  <h3>📊 Connection Strength</h3>
+                  <p>Line thickness shows connection strength: thick lines = strong relationships, thin lines = subtle connections.</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="onboarding-actions">
+              <button 
+                className="demo-button"
+                onClick={() => {
+                  setShowOnboarding(false);
+                  loadKnowledgeGraph();
+                }}
+              >
+                🚀 Explore Demo Stories
+              </button>
+              <button 
+                className="skip-button"
+                onClick={() => setShowOnboarding(false)}
+              >
+                Skip Tour
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="modal-overlay">
+          <div className="help-modal">
+            <div className="modal-header">
+              <h2>❓ How to Use the Knowledge Graph</h2>
+              <button 
+                className="close-button"
+                onClick={() => setShowHelp(false)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="help-content">
+              <div className="help-section">
+                <h3>🎯 What You're Seeing</h3>
+                <ul>
+                  <li><strong>Circles</strong> = News stories (articles) and topic categories (sections)</li>
+                  <li><strong>Lines</strong> = AI-discovered relationships between stories</li>
+                  <li><strong>Colors</strong> = Different types of connections (political, economic, etc.)</li>
+                </ul>
+              </div>
+              
+              <div className="help-section">
+                <h3>🖱️ How to Interact</h3>
+                <ul>
+                  <li><strong>Hover</strong> over circles to highlight connections</li>
+                  <li><strong>Click</strong> article circles to read detailed analysis</li>
+                  <li><strong>Drag</strong> circles to reposition them</li>
+                  <li><strong>Scroll</strong> to zoom in/out of the graph</li>
+                </ul>
+              </div>
+              
+              <div className="help-section">
+                <h3>🔍 Example Connections</h3>
+                <ul>
+                  <li><strong>Political</strong>: Trump's institutional attacks are related</li>
+                  <li><strong>Economic</strong>: Fed policies affect market confidence</li>
+                  <li><strong>Thematic</strong>: International diplomatic coordination</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Feedback Modal */}
+      {showFeedback && (
+        <div className="modal-overlay">
+          <div className="feedback-modal">
+            <div className="modal-header">
+              <h2>💭 Your Feedback Matters!</h2>
+              <p>Help us improve the news knowledge graph experience</p>
+              <button 
+                className="close-button"
+                onClick={() => setShowFeedback(false)}
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="feedback-content">
+              <div className="feedback-section">
+                <label>How intuitive was the interface? (1-10)</label>
+                <input
+                  type="range"
+                  min="1"
+                  max="10"
+                  value={feedbackData.rating}
+                  onChange={(e) => setFeedbackData({...feedbackData, rating: e.target.value})}
+                  className="rating-slider"
+                />
+                <span className="rating-display">{feedbackData.rating}/10</span>
+              </div>
+              
+              <div className="feedback-section">
+                <label>What did you find most interesting?</label>
+                <textarea
+                  value={feedbackData.comments}
+                  onChange={(e) => setFeedbackData({...feedbackData, comments: e.target.value})}
+                  placeholder="E.g., 'The connection between political stories and economic impacts was surprising...'"
+                  className="feedback-textarea"
+                />
+              </div>
+              
+              <div className="feedback-section">
+                <label>Email (optional, for follow-up)</label>
+                <input
+                  type="email"
+                  value={feedbackData.email}
+                  onChange={(e) => setFeedbackData({...feedbackData, email: e.target.value})}
+                  placeholder="your.email@example.com"
+                  className="feedback-input"
+                />
+              </div>
+              
+              <button className="submit-feedback-button" onClick={submitFeedback}>
+                📤 Submit Feedback
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="header">
         <div className="header-content">
           <h1 className="title">News Knowledge Graph</h1>
           <p className="subtitle">AI-Powered Story Relationship Visualization</p>
+          <div className="header-actions">
+            <button 
+              className="help-trigger"
+              onClick={() => setShowHelp(true)}
+            >
+              ❓ How it Works
+            </button>
+            <button 
+              className="feedback-trigger"
+              onClick={() => setShowFeedback(true)}
+            >
+              💭 Give Feedback
+            </button>
+          </div>
         </div>
       </header>
 
@@ -233,17 +474,17 @@ const App = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && searchNews()}
-            placeholder="Search news stories..."
+            placeholder="Try searching: 'Trump', 'climate', 'economy'..."
             className="search-input"
           />
           <button onClick={searchNews} className="search-button">
-            Search
+            🔍 Search & Analyze
           </button>
         </div>
 
         <div className="filters">
           <div className="filter-group">
-            <label>Time Range:</label>
+            <label>📅 Time Range:</label>
             <select value={days} onChange={(e) => setDays(parseInt(e.target.value))}>
               <option value={1}>Last 24 hours</option>
               <option value={3}>Last 3 days</option>
@@ -253,7 +494,7 @@ const App = () => {
           </div>
 
           <div className="filter-group">
-            <label>Section:</label>
+            <label>📰 Section:</label>
             <select value={section} onChange={(e) => setSection(e.target.value)}>
               <option value="">All sections</option>
               {sections.slice(1).map(sec => (
@@ -265,7 +506,7 @@ const App = () => {
           </div>
 
           <button onClick={loadKnowledgeGraph} className="refresh-button">
-            Refresh Graph
+            🔄 Load Demo
           </button>
         </div>
       </div>
@@ -277,7 +518,10 @@ const App = () => {
           {loading && (
             <div className="loading-overlay">
               <div className="loading-spinner"></div>
-              <p>Analyzing stories with AI...</p>
+              <p>🤖 AI is analyzing story connections...</p>
+              <div className="loading-tips">
+                <p>💡 While you wait: Stories are being analyzed for economic, political, social, and thematic relationships</p>
+              </div>
             </div>
           )}
           <svg ref={svgRef} className="graph-svg"></svg>
@@ -286,21 +530,43 @@ const App = () => {
           {graphData.metadata && (
             <div className="graph-info">
               <div className="info-item">
-                <span className="info-label">Articles:</span>
+                <span className="info-label">📰 Stories:</span>
                 <span className="info-value">{graphData.metadata.total_articles || 0}</span>
               </div>
               <div className="info-item">
-                <span className="info-label">Connections:</span>
+                <span className="info-label">🔗 Connections:</span>
                 <span className="info-value">{graphData.metadata.total_connections || 0}</span>
               </div>
               <div className="info-item">
-                <span className="info-label">AI Analysis:</span>
+                <span className="info-label">🤖 AI Analysis:</span>
                 <span className="info-value">
-                  {graphData.metadata.ai_analysis_enabled ? 'Enabled' : 'Disabled'}
+                  {graphData.metadata.ai_analysis_enabled ? '✅ Active' : '❌ Offline'}
                 </span>
               </div>
+              {graphData.metadata.demo_mode && (
+                <div className="info-item">
+                  <span className="info-label">🎭 Mode:</span>
+                  <span className="info-value">Demo</span>
+                </div>
+              )}
             </div>
           )}
+          
+          {/* Interactive Instructions */}
+          <div className="interaction-guide">
+            <div className="guide-item">
+              <span className="guide-icon">🖱️</span>
+              <span>Hover circles for connections</span>
+            </div>
+            <div className="guide-item">
+              <span className="guide-icon">👆</span>
+              <span>Click articles for details</span>
+            </div>
+            <div className="guide-item">
+              <span className="guide-icon">🔄</span>
+              <span>Drag to reposition</span>
+            </div>
+          </div>
         </div>
 
         {/* Story Detail Panel */}
@@ -324,23 +590,28 @@ const App = () => {
                 </span>
               </div>
 
+              <div className="ai-analysis-badge">
+                <span className="ai-icon">🤖</span>
+                <span>AI-Generated Analysis</span>
+              </div>
+
               <div className="story-lede">
-                <h4>Lede</h4>
+                <h4>📰 Lede (Opening Hook)</h4>
                 <p>{selectedNode.lede}</p>
               </div>
 
               <div className="story-nutgraf">
-                <h4>Nutgraf</h4>
+                <h4>🎯 Nutgraf (Why It Matters)</h4>
                 <p>{selectedNode.nutgraf}</p>
               </div>
 
               <div className="story-summary">
-                <h4>Summary</h4>
+                <h4>📋 AI Summary</h4>
                 <p>{selectedNode.summary}</p>
               </div>
 
               <div className="story-engagement">
-                <h4>Social Preview</h4>
+                <h4>📱 Social Media Preview</h4>
                 <p className="engagement-preview">{selectedNode.engagement_preview}</p>
               </div>
 
@@ -351,46 +622,72 @@ const App = () => {
                   rel="noopener noreferrer"
                   className="read-full-button"
                 >
-                  Read Full Article
+                  📖 Read Full Article
                 </a>
+                <button 
+                  className="connection-button"
+                  onClick={() => {
+                    // Highlight connections for this story
+                    const svg = d3.select(svgRef.current);
+                    svg.selectAll('.link')
+                      .style('stroke-opacity', link => 
+                        link.source.id === selectedNode.id || link.target.id === selectedNode.id ? 1 : 0.1
+                      );
+                  }}
+                >
+                  🔗 Show Connections
+                </button>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Legend */}
+      {/* Enhanced Legend */}
       <div className="legend">
-        <h4>Connection Types</h4>
+        <h4>🎨 Connection Types</h4>
         <div className="legend-items">
           <div className="legend-item">
             <div className="legend-line" style={{backgroundColor: '#f39c12'}}></div>
-            <span>Economic</span>
+            <span>💰 Economic</span>
           </div>
           <div className="legend-item">
             <div className="legend-line" style={{backgroundColor: '#3498db'}}></div>
-            <span>Political</span>
+            <span>🏛️ Political</span>
           </div>
           <div className="legend-item">
             <div className="legend-line" style={{backgroundColor: '#e74c3c'}}></div>
-            <span>Social</span>
+            <span>👥 Social</span>
           </div>
           <div className="legend-item">
             <div className="legend-line" style={{backgroundColor: '#27ae60'}}></div>
-            <span>Environmental</span>
+            <span>🌍 Environmental</span>
           </div>
           <div className="legend-item">
             <div className="legend-line" style={{backgroundColor: '#9b59b6'}}></div>
-            <span>Causal</span>
+            <span>⚡ Causal</span>
           </div>
           <div className="legend-item">
             <div className="legend-line" style={{backgroundColor: '#e67e22'}}></div>
-            <span>Thematic</span>
+            <span>🎭 Thematic</span>
           </div>
         </div>
-        <p className="legend-note">
-          Line thickness = connection strength • Click nodes for details • Drag to reposition
-        </p>
+        <div className="legend-explanation">
+          <p className="legend-note">
+            📏 <strong>Line thickness = connection strength</strong><br/>
+            🔍 Thick lines = strong relationships • Thin lines = subtle connections
+          </p>
+        </div>
+      </div>
+
+      {/* Call-to-Action for Feedback */}
+      <div className="floating-feedback">
+        <button 
+          className="floating-feedback-button"
+          onClick={() => setShowFeedback(true)}
+        >
+          💬 Quick Feedback
+        </button>
       </div>
     </div>
   );

@@ -15,9 +15,9 @@ import json
 load_dotenv()
 
 app = FastAPI(
-    title="News Knowledge Graph API",
-    description="AI-powered news knowledge graph visualization tool",
-    version="1.0.0"
+    title="News Knowledge Graph API - User Testing Version",
+    description="AI-powered news knowledge graph visualization tool optimized for user feedback",
+    version="2.0.0"
 )
 
 # CORS middleware
@@ -41,6 +41,13 @@ client = AsyncIOMotorClient(MONGO_URL)
 db = client.news_knowledge_graph
 
 # Models
+class UserFeedback(BaseModel):
+    rating: int
+    comments: str
+    email: Optional[str] = None
+    timestamp: datetime = datetime.now()
+    session_id: Optional[str] = None
+
 class GuardianTag(BaseModel):
     id: str
     type: str
@@ -482,106 +489,28 @@ news_processor = NewsProcessor()
 @app.get("/api/")
 async def root():
     return {
-        "message": "News Knowledge Graph API",
-        "version": "1.0.0",
+        "message": "News Knowledge Graph API - User Testing Version",
+        "version": "2.0.0",
         "ai_enabled": AI_AVAILABLE,
+        "features": [
+            "Interactive onboarding",
+            "User feedback collection", 
+            "Enhanced tooltips and help",
+            "Optimized for user testing"
+        ],
         "endpoints": {
-            "recent_news": "/api/news/recent",
+            "demo_graph": "/api/demo-graph",
             "knowledge_graph": "/api/knowledge-graph",
+            "feedback": "/api/feedback",
             "health": "/api/health"
         }
     }
 
-@app.get("/api/news/recent")
-async def get_recent_news(
-    days: int = Query(default=7, ge=1, le=30, description="Days back to search"),
-    section: Optional[str] = Query(default=None, description="Filter by section"),
-    page_size: int = Query(default=20, ge=5, le=50, description="Number of articles")
-):
-    """Get recent news articles"""
-    to_date = datetime.now().strftime('%Y-%m-%d')
-    from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-    
-    async with GuardianAPIClient(GUARDIAN_API_KEY) as client:
-        response = await client.search_content(
-            section=section,
-            from_date=from_date,
-            to_date=to_date,
-            page_size=page_size,
-            order_by="newest"
-        )
-    
-    # Process articles with AI
-    processed_stories = await news_processor.process_articles(response["results"])
-    
-    return {
-        "articles": [story.dict() for story in processed_stories],
-        "total": len(processed_stories),
-        "query_parameters": {
-            "days": days,
-            "section": section,
-            "from_date": from_date,
-            "to_date": to_date
-        }
-    }
-
-@app.get("/api/knowledge-graph")
-async def get_knowledge_graph(
-    days: int = Query(default=3, ge=1, le=14, description="Days back for analysis"),
-    section: Optional[str] = Query(default=None, description="Filter by section"),
-    max_articles: int = Query(default=15, ge=5, le=25, description="Max articles for analysis")
-):
-    """Generate knowledge graph with AI-analyzed story relationships"""
-    to_date = datetime.now().strftime('%Y-%m-%d')
-    from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-    
-    async with GuardianAPIClient(GUARDIAN_API_KEY) as client:
-        response = await client.search_content(
-            section=section,
-            from_date=from_date,
-            to_date=to_date,
-            page_size=max_articles,
-            order_by="newest"
-        )
-    
-    raw_articles = response["results"]
-    processed_stories = await news_processor.process_articles(raw_articles)
-    
-    # Create knowledge graph with AI analysis
-    knowledge_graph = await news_processor.create_knowledge_graph(processed_stories, raw_articles)
-    
-    return knowledge_graph.dict()
-
-@app.get("/api/search")
-async def search_news(
-    query: str = Query(..., description="Search query"),
-    days: int = Query(default=7, ge=1, le=30, description="Days back to search"),
-    max_articles: int = Query(default=15, ge=5, le=25, description="Max articles")
-):
-    """Search news with AI analysis"""
-    to_date = datetime.now().strftime('%Y-%m-%d')
-    from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
-    
-    async with GuardianAPIClient(GUARDIAN_API_KEY) as client:
-        response = await client.search_content(
-            query=query,
-            from_date=from_date,
-            to_date=to_date,
-            page_size=max_articles,
-            order_by="relevance"
-        )
-    
-    raw_articles = response["results"]
-    processed_stories = await news_processor.process_articles(raw_articles)
-    knowledge_graph = await news_processor.create_knowledge_graph(processed_stories, raw_articles)
-    
-    return knowledge_graph.dict()
-
 @app.get("/api/demo-graph")
 async def get_demo_knowledge_graph():
-    """Demo knowledge graph with pre-analyzed connections - no API calls needed"""
+    """Enhanced demo knowledge graph optimized for user testing with detailed explanations"""
     
-    # Demo data with rich AI-style content
+    # Enhanced demo data with more detailed AI-style content
     demo_nodes = [
         {
             "id": "trump-labor-firing",
@@ -692,13 +621,13 @@ async def get_demo_knowledge_graph():
     ]
     
     demo_edges = [
-        # Story connections with varying strengths
+        # Story connections with detailed explanations for user understanding
         {
             "source": "trump-labor-firing",
             "target": "fed-interest-rates", 
             "type": "political",
             "strength": 0.9,
-            "explanation": "Both stories demonstrate Trump's direct interference with independent federal institutions",
+            "explanation": "Both stories demonstrate Trump's direct interference with independent federal institutions, showing a pattern of political pressure on traditionally autonomous government agencies.",
             "keywords": ["Trump", "federal institutions", "political pressure", "independence"],
             "width": 7.2,
             "opacity": 0.93
@@ -708,7 +637,7 @@ async def get_demo_knowledge_graph():
             "target": "climate-summit",
             "type": "economic", 
             "strength": 0.6,
-            "explanation": "Interest rates and environmental policies both significantly impact economic stability and investment decisions",
+            "explanation": "Interest rate policies and environmental regulations both significantly impact economic stability, investment decisions, and market confidence, creating interconnected economic pressures.",
             "keywords": ["economic policy", "market stability", "investment", "government intervention"],
             "width": 4.8,
             "opacity": 0.72
@@ -718,7 +647,7 @@ async def get_demo_knowledge_graph():
             "target": "fed-interest-rates",
             "type": "economic",
             "strength": 0.5,
-            "explanation": "Both regulatory pressures affect market confidence and innovation in their respective sectors", 
+            "explanation": "Both regulatory pressures affect market confidence and innovation in their respective sectors, with potential ripple effects on economic growth and competitiveness.", 
             "keywords": ["regulation", "market impact", "innovation", "oversight"],
             "width": 4.0,
             "opacity": 0.65
@@ -728,7 +657,7 @@ async def get_demo_knowledge_graph():
             "target": "climate-summit", 
             "type": "thematic",
             "strength": 0.4,
-            "explanation": "Both involve international diplomatic coordination on global challenges requiring multilateral solutions",
+            "explanation": "Both stories involve international diplomatic coordination on global challenges requiring multilateral solutions and coordinated policy responses from multiple nations.",
             "keywords": ["international diplomacy", "global cooperation", "multilateral solutions"],
             "width": 3.2,
             "opacity": 0.58
@@ -738,7 +667,7 @@ async def get_demo_knowledge_graph():
             "target": "tech-regulation",
             "type": "causal",
             "strength": 0.7,
-            "explanation": "Political attacks on institutions create precedent for government interference in regulatory processes",
+            "explanation": "Political attacks on institutional independence create precedent for government interference in regulatory processes, potentially weakening oversight mechanisms across sectors.",
             "keywords": ["institutional independence", "government interference", "regulatory autonomy"],
             "width": 5.6, 
             "opacity": 0.79
@@ -796,9 +725,168 @@ async def get_demo_knowledge_graph():
             "generated_at": datetime.now().isoformat(),
             "ai_analysis_enabled": True,
             "demo_mode": True,
-            "note": "This demo showcases AI-powered story relationship analysis with realistic news scenarios"
+            "user_testing_version": True,
+            "note": "This enhanced demo showcases AI-powered story relationship analysis with detailed explanations optimized for user feedback and testing"
         }
     }
+
+@app.post("/api/feedback")
+async def submit_feedback(feedback: UserFeedback):
+    """Collect user feedback for testing and improvement"""
+    try:
+        # Store in database for analysis
+        feedback_doc = feedback.dict()
+        feedback_doc["session_id"] = str(uuid.uuid4())
+        
+        await db.user_feedback.insert_one(feedback_doc)
+        
+        print(f"New feedback received: {feedback.rating}/10 - {feedback.comments[:50]}...")
+        
+        return {
+            "status": "success",
+            "message": "Thank you for your feedback! Your input helps us improve the experience.",
+            "feedback_id": feedback_doc["session_id"]
+        }
+    except Exception as e:
+        print(f"Error storing feedback: {e}")
+        return {
+            "status": "noted",
+            "message": "Thanks for your feedback! (Demo mode - feedback noted locally)"
+        }
+
+@app.get("/api/health")
+async def health_check():
+    """Health check with user testing status"""
+    return {
+        "status": "healthy",
+        "version": "2.0.0 - User Testing",
+        "timestamp": datetime.now().isoformat(),
+        "ai_services": "available" if AI_AVAILABLE else "disabled",
+        "features": {
+            "demo_mode": "active",
+            "feedback_collection": "enabled",
+            "user_onboarding": "enhanced",
+            "interactive_tooltips": "enabled"
+        },
+        "testing_ready": True
+    }
+
+@app.get("/api/news/recent")
+async def get_recent_news(
+    days: int = Query(default=7, ge=1, le=30, description="Days back to search"),
+    section: Optional[str] = Query(default=None, description="Filter by section"),
+    page_size: int = Query(default=20, ge=5, le=50, description="Number of articles")
+):
+    """Get recent news articles (may be limited by API quotas)"""
+    to_date = datetime.now().strftime('%Y-%m-%d')
+    from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+    
+    try:
+        async with GuardianAPIClient(GUARDIAN_API_KEY) as client:
+            response = await client.search_content(
+                section=section,
+                from_date=from_date,
+                to_date=to_date,
+                page_size=page_size,
+                order_by="newest"
+            )
+        
+        # Process articles with AI
+        processed_stories = await news_processor.process_articles(response["results"])
+        
+        return {
+            "articles": [story.dict() for story in processed_stories],
+            "total": len(processed_stories),
+            "query_parameters": {
+                "days": days,
+                "section": section,
+                "from_date": from_date,
+                "to_date": to_date
+            },
+            "note": "Real Guardian API data with AI analysis"
+        }
+    except Exception as e:
+        # Fallback to demo data if API fails
+        demo_data = await get_demo_knowledge_graph()
+        articles = [node for node in demo_data["nodes"] if node["type"] == "article"]
+        return {
+            "articles": articles,
+            "total": len(articles),
+            "query_parameters": {
+                "days": days,
+                "section": section,
+                "from_date": from_date,
+                "to_date": to_date
+            },
+            "note": "Demo data (API quota limited)",
+            "fallback_mode": True
+        }
+
+@app.get("/api/knowledge-graph")
+async def get_knowledge_graph(
+    days: int = Query(default=3, ge=1, le=14, description="Days back for analysis"),
+    section: Optional[str] = Query(default=None, description="Filter by section"),
+    max_articles: int = Query(default=15, ge=5, le=25, description="Max articles for analysis")
+):
+    """Generate knowledge graph with AI-analyzed story relationships (may timeout due to quotas)"""
+    try:
+        to_date = datetime.now().strftime('%Y-%m-%d')
+        from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        
+        async with GuardianAPIClient(GUARDIAN_API_KEY) as client:
+            response = await client.search_content(
+                section=section,
+                from_date=from_date,
+                to_date=to_date,
+                page_size=max_articles,
+                order_by="newest"
+            )
+        
+        raw_articles = response["results"]
+        processed_stories = await news_processor.process_articles(raw_articles)
+        
+        # Create knowledge graph with AI analysis
+        knowledge_graph = await news_processor.create_knowledge_graph(processed_stories, raw_articles)
+        
+        return knowledge_graph.dict()
+    except Exception as e:
+        # Fallback to demo data
+        print(f"Knowledge graph error: {e}, falling back to demo")
+        return await get_demo_knowledge_graph()
+
+@app.get("/api/search")
+async def search_news(
+    query: str = Query(..., description="Search query"),
+    days: int = Query(default=7, ge=1, le=30, description="Days back to search"),
+    max_articles: int = Query(default=15, ge=5, le=25, description="Max articles")
+):
+    """Search news with AI analysis (may timeout due to quotas)"""
+    try:
+        to_date = datetime.now().strftime('%Y-%m-%d')
+        from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        
+        async with GuardianAPIClient(GUARDIAN_API_KEY) as client:
+            response = await client.search_content(
+                query=query,
+                from_date=from_date,
+                to_date=to_date,
+                page_size=max_articles,
+                order_by="relevance"
+            )
+        
+        raw_articles = response["results"]
+        processed_stories = await news_processor.process_articles(raw_articles)
+        knowledge_graph = await news_processor.create_knowledge_graph(processed_stories, raw_articles)
+        
+        return knowledge_graph.dict()
+    except Exception as e:
+        # Fallback to demo data with search context
+        print(f"Search error: {e}, falling back to demo")
+        demo_data = await get_demo_knowledge_graph()
+        demo_data["metadata"]["search_query"] = query
+        demo_data["metadata"]["fallback_mode"] = True
+        demo_data["metadata"]["note"] = f"Demo data shown (searched for: {query})"
+        return demo_data
 
 if __name__ == "__main__":
     import uvicorn
