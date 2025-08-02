@@ -577,23 +577,228 @@ async def search_news(
     
     return knowledge_graph.dict()
 
-@app.get("/api/health")
-async def health_check():
-    """Health check endpoint"""
-    try:
-        # Test Guardian API
-        async with GuardianAPIClient(GUARDIAN_API_KEY) as client:
-            await client.search_content(page_size=1)
-        
-        return {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "guardian_api": "connected",
-            "ai_services": "available" if AI_AVAILABLE else "disabled",
-            "database": "connected"
+@app.get("/api/demo-graph")
+async def get_demo_knowledge_graph():
+    """Demo knowledge graph with pre-analyzed connections - no API calls needed"""
+    
+    # Demo data with rich AI-style content
+    demo_nodes = [
+        {
+            "id": "trump-labor-firing",
+            "type": "article",
+            "title": "Trump fires labor statistics chief amid job data controversy",
+            "summary": "President Trump dismissed the head of labor statistics, claiming she manipulated job numbers to damage his administration. The move has sparked concerns about the politicization of economic data and its potential impact on market confidence.",
+            "lede": "Trump's latest firing sends shockwaves through the economics community as data integrity comes under question.",
+            "nutgraf": "This unprecedented dismissal of a key statistical official raises serious questions about the independence of economic data collection, which is crucial for policy-making and market stability worldwide.",
+            "section": "Politics", 
+            "publication_date": "2025-08-02T01:00:00Z",
+            "url": "https://example.com/trump-labor-firing",
+            "engagement_preview": "🚨 Trump fires labor chief over job numbers! Claims data was rigged to hurt his presidency. What does this mean for economic transparency? #TrumpFiring #EconomicData",
+            "size": 25,
+            "color": "#3498db"
+        },
+        {
+            "id": "fed-interest-rates",
+            "type": "article", 
+            "title": "Federal Reserve under pressure as Trump demands rate cuts",
+            "summary": "Trump intensifies his criticism of Fed Chair Jerome Powell, calling for aggressive interest rate cuts and threatening to override his decisions. The unprecedented political pressure on the Fed raises concerns about monetary policy independence.",
+            "lede": "The Fed faces its greatest political challenge in decades as Trump escalates his attack on monetary policy independence.",
+            "nutgraf": "Trump's direct confrontation with the Federal Reserve represents a fundamental threat to the institution's autonomy, which has been a cornerstone of stable monetary policy since the 1950s.",
+            "section": "Business",
+            "publication_date": "2025-08-02T02:00:00Z", 
+            "url": "https://example.com/fed-pressure",
+            "engagement_preview": "🏦 BREAKING: Trump vs. The Fed intensifies! Demands rate cuts, threatens Powell's authority. Could this destabilize markets? #TrumpVsFed #InterestRates",
+            "size": 30,
+            "color": "#f39c12"
+        },
+        {
+            "id": "gaza-diplomacy",
+            "type": "article",
+            "title": "Australia's foreign minister criticizes Israel over Gaza humanitarian crisis", 
+            "summary": "Foreign Minister Penny Wong held a closed-door meeting with Israel's ambassador, expressing strong concerns about Gaza's humanitarian situation and calling for increased aid access. The diplomatic intervention reflects growing international pressure on Israel.",
+            "lede": "Australia joins the growing chorus of nations demanding humanitarian access to Gaza as the crisis deepens.",
+            "nutgraf": "Wong's diplomatic intervention signals a shift in Australia's Middle East policy, potentially affecting regional alliances and international humanitarian efforts in Gaza.",
+            "section": "World",
+            "publication_date": "2025-08-02T03:00:00Z",
+            "url": "https://example.com/gaza-diplomacy", 
+            "engagement_preview": "🇦🇺 Australia takes stand on Gaza! Foreign Minister Wong confronts Israeli ambassador in private meeting. Diplomatic tensions rising? #GazaCrisis #Diplomacy",
+            "size": 22,
+            "color": "#e74c3c"
+        },
+        {
+            "id": "climate-summit",
+            "type": "article",
+            "title": "Global climate summit addresses economic impacts of environmental policy",
+            "summary": "World leaders gather to discuss how climate policies are reshaping global economics, with particular focus on how environmental regulations affect market stability and international trade relationships.",
+            "lede": "Climate policy meets economic reality as world leaders seek sustainable solutions to environmental challenges.",  
+            "nutgraf": "The intersection of environmental policy and economic stability has become a critical issue for global governance, affecting everything from energy markets to international trade agreements.",
+            "section": "Environment",
+            "publication_date": "2025-08-02T04:00:00Z",
+            "url": "https://example.com/climate-summit",
+            "engagement_preview": "🌍 Climate summit tackles the trillion-dollar question: How do we save the planet without crashing the economy? #ClimatePolicy #GlobalEconomy",
+            "size": 20,
+            "color": "#27ae60"
+        },
+        {
+            "id": "tech-regulation",
+            "type": "article", 
+            "title": "New tech regulations spark debate over innovation vs. oversight",
+            "summary": "Government proposals for stricter tech regulation have divided opinion, with supporters citing data privacy concerns while critics warn of potential impacts on innovation and economic competitiveness in the global market.",
+            "lede": "The battle over tech regulation intensifies as governments worldwide grapple with digital oversight challenges.",
+            "nutgraf": "These regulatory proposals represent a critical moment in defining the relationship between technological innovation and democratic governance in the digital age.",
+            "section": "Technology",
+            "publication_date": "2025-08-02T05:00:00Z", 
+            "url": "https://example.com/tech-regulation",
+            "engagement_preview": "⚖️ Tech giants face new regulations! Innovation vs. oversight battle heats up. Will this stifle the next breakthrough or protect our privacy? #TechRegulation",
+            "size": 18,
+            "color": "#9b59b6"
+        },
+        # Section nodes
+        {
+            "id": "section_politics",
+            "type": "section",
+            "title": "Politics",
+            "size": 35,
+            "color": "#3498db"
+        },
+        {
+            "id": "section_business", 
+            "type": "section",
+            "title": "Business",
+            "size": 35,
+            "color": "#f39c12"
+        },
+        {
+            "id": "section_world",
+            "type": "section", 
+            "title": "World",
+            "size": 35,
+            "color": "#e74c3c"
+        },
+        {
+            "id": "section_environment",
+            "type": "section",
+            "title": "Environment", 
+            "size": 35,
+            "color": "#27ae60"
+        },
+        {
+            "id": "section_technology",
+            "type": "section",
+            "title": "Technology",
+            "size": 35, 
+            "color": "#9b59b6"
         }
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Service unhealthy: {str(e)}")
+    ]
+    
+    demo_edges = [
+        # Story connections with varying strengths
+        {
+            "source": "trump-labor-firing",
+            "target": "fed-interest-rates", 
+            "type": "political",
+            "strength": 0.9,
+            "explanation": "Both stories demonstrate Trump's direct interference with independent federal institutions",
+            "keywords": ["Trump", "federal institutions", "political pressure", "independence"],
+            "width": 7.2,
+            "opacity": 0.93
+        },
+        {
+            "source": "fed-interest-rates",
+            "target": "climate-summit",
+            "type": "economic", 
+            "strength": 0.6,
+            "explanation": "Interest rates and environmental policies both significantly impact economic stability and investment decisions",
+            "keywords": ["economic policy", "market stability", "investment", "government intervention"],
+            "width": 4.8,
+            "opacity": 0.72
+        },
+        {
+            "source": "tech-regulation",
+            "target": "fed-interest-rates",
+            "type": "economic",
+            "strength": 0.5,
+            "explanation": "Both regulatory pressures affect market confidence and innovation in their respective sectors", 
+            "keywords": ["regulation", "market impact", "innovation", "oversight"],
+            "width": 4.0,
+            "opacity": 0.65
+        },
+        {
+            "source": "gaza-diplomacy",
+            "target": "climate-summit", 
+            "type": "thematic",
+            "strength": 0.4,
+            "explanation": "Both involve international diplomatic coordination on global challenges requiring multilateral solutions",
+            "keywords": ["international diplomacy", "global cooperation", "multilateral solutions"],
+            "width": 3.2,
+            "opacity": 0.58
+        },
+        {
+            "source": "trump-labor-firing",
+            "target": "tech-regulation",
+            "type": "causal",
+            "strength": 0.7,
+            "explanation": "Political attacks on institutions create precedent for government interference in regulatory processes",
+            "keywords": ["institutional independence", "government interference", "regulatory autonomy"],
+            "width": 5.6, 
+            "opacity": 0.79
+        },
+        # Section connections
+        {
+            "source": "trump-labor-firing",
+            "target": "section_politics",
+            "type": "belongs_to",
+            "strength": 1.0,
+            "width": 2,
+            "opacity": 0.4
+        },
+        {
+            "source": "fed-interest-rates", 
+            "target": "section_business",
+            "type": "belongs_to",
+            "strength": 1.0,
+            "width": 2,
+            "opacity": 0.4
+        },
+        {
+            "source": "gaza-diplomacy",
+            "target": "section_world",
+            "type": "belongs_to", 
+            "strength": 1.0,
+            "width": 2,
+            "opacity": 0.4
+        },
+        {
+            "source": "climate-summit",
+            "target": "section_environment",
+            "type": "belongs_to",
+            "strength": 1.0, 
+            "width": 2,
+            "opacity": 0.4
+        },
+        {
+            "source": "tech-regulation",
+            "target": "section_technology", 
+            "type": "belongs_to",
+            "strength": 1.0,
+            "width": 2,
+            "opacity": 0.4
+        }
+    ]
+    
+    return {
+        "nodes": demo_nodes,
+        "edges": demo_edges,
+        "metadata": {
+            "total_articles": 5,
+            "total_sections": 5, 
+            "total_connections": 5,
+            "generated_at": datetime.now().isoformat(),
+            "ai_analysis_enabled": True,
+            "demo_mode": True,
+            "note": "This demo showcases AI-powered story relationship analysis with realistic news scenarios"
+        }
+    }
 
 if __name__ == "__main__":
     import uvicorn
