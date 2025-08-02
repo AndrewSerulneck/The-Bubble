@@ -200,61 +200,78 @@ Keep content informative but accessible and engaging."""
         if len(stories) < 2:
             return []
         
-        # Prepare stories for analysis
+        # Prepare stories for analysis (limit to reduce token usage)
         story_data = []
-        for story in stories:
+        for story in stories[:6]:  # Limit to 6 stories to avoid rate limits
+            content = story.get("fields", {}).get("body", "")
+            # Clean and limit content
+            content = content.replace("<p>", "").replace("</p>", " ").replace("<strong>", "").replace("</strong>", "")
+            content = content[:500]  # Shorter content to reduce tokens
+            
             story_data.append({
                 "id": story.get("id"),
                 "title": story.get("webTitle", ""),
-                "content": story.get("fields", {}).get("body", "")[:1000],  # Limit content length
+                "content": content,
                 "section": story.get("sectionName", ""),
-                "tags": [tag.get("webTitle", "") for tag in story.get("tags", [])]
+                "tags": [tag.get("webTitle", "") for tag in story.get("tags", [])][:3]  # Limit tags
             })
         
-        analysis_prompt = f"""Analyze the relationships between these {len(story_data)} news stories and identify meaningful connections:
+        # Shorter, more focused prompt to reduce token usage
+        analysis_prompt = f"""Analyze connections between these {len(story_data)} news stories:
 
-{json.dumps(story_data, indent=2)}
+{json.dumps(story_data)}
 
-For each pair of stories that have a meaningful connection, provide:
-1. source_id and target_id
-2. connection_type (economic, political, social, environmental, causal, thematic)
-3. strength (0.0-1.0 where 1.0 is direct causation, 0.5 is strong thematic connection, 0.2 is weak association)
-4. explanation (clear description of how they're connected)
-5. keywords (key terms that represent the connection)
+Return ONLY a JSON array of meaningful connections (minimum strength 0.3):
 
-Return ONLY a JSON array of connections. Example format:
-[
-  {{
-    "source_id": "story1_id",
-    "target_id": "story2_id", 
-    "connection_type": "economic",
-    "strength": 0.8,
-    "explanation": "Political unrest in the Middle East is likely to drive up oil prices, affecting global markets",
-    "keywords": ["oil prices", "political instability", "global markets"]
-  }}
-]
+[{{"source_id": "id1", "target_id": "id2", "connection_type": "economic|political|social|environmental|causal|thematic", "strength": 0.3-1.0, "explanation": "brief reason", "keywords": ["key1", "key2"]}}]
 
-Only include meaningful connections with strength >= 0.2. Focus on quality over quantity."""
+Maximum 3 connections. If no strong connections exist, return []."""
 
         try:
             user_message = UserMessage(text=analysis_prompt)
             response = await self.claude_chat.send_message(user_message)
             
-            # Parse Claude's response
-            connections_data = json.loads(response.strip())
+            # Clean and parse Claude's response
+            response_text = response.strip()
+            print(f"Claude raw response: {response_text[:200]}...")
             
+            # Handle empty or non-JSON responses
+            if not response_text or response_text.lower() in ['none', 'no connections', '[]']:
+                print("Claude returned no connections")
+                return []
+            
+            # Try to extract JSON from response
+            if response_text.startswith('['):
+                connections_data = json.loads(response_text)
+            else:
+                # Try to find JSON in response
+                import re
+                json_match = re.search(r'\[.*\]', response_text, re.DOTALL)
+                if json_match:
+                    connections_data = json.loads(json_match.group())
+                else:
+                    print("No JSON array found in Claude response")
+                    return []
+            
+            # Validate and create connections
             connections = []
             for conn in connections_data:
-                connections.append(StoryConnection(
-                    source_id=conn["source_id"],
-                    target_id=conn["target_id"],
-                    connection_type=conn["connection_type"],
-                    strength=float(conn["strength"]),
-                    explanation=conn["explanation"],
-                    keywords=conn["keywords"]
-                ))
+                if all(key in conn for key in ["source_id", "target_id", "connection_type", "strength"]):
+                    connections.append(StoryConnection(
+                        source_id=conn["source_id"],
+                        target_id=conn["target_id"],
+                        connection_type=conn["connection_type"],
+                        strength=float(conn["strength"]),
+                        explanation=conn.get("explanation", "Connection found by AI"),
+                        keywords=conn.get("keywords", [])
+                    ))
             
+            print(f"Created {len(connections)} story connections")
             return connections
+            
+        except json.JSONDecodeError as e:
+            print(f"Claude JSON parsing error: {e}. Response: {response_text[:200] if 'response_text' in locals() else 'No response'}")
+            return []
         except Exception as e:
             print(f"Claude analysis error: {e}")
             return []
