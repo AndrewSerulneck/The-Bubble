@@ -533,6 +533,38 @@ Complexity Guide:
             entities.extend(matches[:3])
         
         return list(set(entities))[:10]
+    
+    def _extract_economic_indicators(self, content: str) -> List[str]:
+        """Extract economic terms and indicators for causal analysis"""
+        import re
+        economic_terms = []
+        patterns = [
+            r'\b(?:oil price|gas price|inflation|interest rate|unemployment|GDP|stock market|commodity|trade|tariff|currency|dollar|euro|yen)\w*\b',
+            r'\b(?:Federal Reserve|central bank|monetary policy|fiscal policy|recession|growth|earnings|revenue|profit|loss)\b',
+            r'\b(?:supply chain|manufacturing|production|consumer|retail|housing market|real estate)\b'
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, content.lower())
+            economic_terms.extend(matches)
+        
+        return list(set(economic_terms))[:5]
+    
+    def _extract_political_entities(self, content: str) -> List[str]:
+        """Extract political entities and terms for causal analysis"""
+        import re
+        political_terms = []
+        patterns = [
+            r'\b(?:government|congress|senate|parliament|president|prime minister|minister|policy|legislation|bill|law|regulation)\b',
+            r'\b(?:election|campaign|vote|ballot|democracy|Republican|Democrat|Conservative|Labour|Liberal)\b',
+            r'\b(?:sanction|treaty|diplomatic|foreign policy|national security|defense|military)\b'
+        ]
+        
+        for pattern in patterns:
+            matches = re.findall(pattern, content.lower())
+            political_terms.extend(matches)
+        
+        return list(set(political_terms))[:5]
 
 # Initialize enhanced AI analyzer
 ai_analyzer = None
