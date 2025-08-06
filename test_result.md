@@ -140,15 +140,18 @@ backend:
 
   - task: "Enhanced API v4 Integration"
     implemented: true
-    working: true
+    working: false
     file: "server.py"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: true
         agent: "main"
         comment: "SUCCESS: Backend v4 API endpoints working. Health check shows all advanced features enabled: multi_source_integration, advanced_ai_analysis, real_time_updates, geographic_analysis, temporal_analysis, sentiment_analysis, complexity_adaptation, influence_metrics."
+      - working: false
+        agent: "testing"
+        comment: "CRITICAL BACKEND ISSUES IDENTIFIED: ❌ Missing 'create_ultimate_knowledge_graph' method in AdvancedNewsProcessor class causing AttributeError and preventing graph generation. ❌ NYT API rate limiting (429 Too Many Requests) affecting data retrieval. ❌ Missing endpoints: /api/v3/analytics/track and /api/v4/news/search returning 404 errors. ❌ OpenAI API rate limiting causing delays in AI analysis. IMPACT: Frontend loads correctly but graph visualization remains in perpetual loading state. Backend needs immediate fixes: 1) Implement missing create_ultimate_knowledge_graph method, 2) Add missing analytics and search endpoints, 3) Implement proper rate limiting handling for external APIs."
 
 frontend:
   - task: "NYT Source Selection"
