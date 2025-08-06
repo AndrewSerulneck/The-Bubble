@@ -312,55 +312,68 @@ Always return comprehensive structured JSON."""
 
     # Keep existing methods but enhance them
     async def analyze_story_connections(self, stories: List[Dict], user_prefs: UserPreferences) -> List[AdvancedConnection]:
-        # Enhanced version of existing method with additional features
+        """Enhanced causal relationship analysis - finds connections between ALL stories"""
         if len(stories) < 2:
             return []
         
         story_data = []
-        for story in stories[:10]:  # Increased limit
+        for story in stories[:15]:  # Analyze more stories for comprehensive connections
             content = self._extract_content(story)
             
             story_info = {
                 "id": story.get("id", ""),
                 "title": story.get("webTitle", "") or story.get("headline", {}).get("main", ""),
-                "content": content[:1200],  # Increased content
+                "content": content[:1500],  # More content for better analysis
                 "source": story.get("source", "guardian"),
                 "section": story.get("sectionName", "") or story.get("section_name", ""),
                 "pub_date": story.get("webPublicationDate", "") or story.get("pub_date", ""),
                 "keywords": self._extract_keywords(story),
                 "location_mentions": self._extract_locations(content),
-                "entities": self._extract_entities(content)
+                "entities": self._extract_entities(content),
+                "economic_indicators": self._extract_economic_indicators(content),
+                "political_entities": self._extract_political_entities(content)
             }
             story_data.append(story_info)
         
-        analysis_prompt = f"""Conduct advanced relationship analysis on these {len(story_data)} stories:
+        # Enhanced prompt specifically for causal relationship analysis
+        analysis_prompt = f"""You are an expert analyst specializing in CAUSAL RELATIONSHIPS between news events. Analyze these {len(story_data)} stories and find ALL possible causal connections, including non-obvious ones.
 
+STORIES TO ANALYZE:
 {json.dumps(story_data, indent=2)}
 
-User preferences: complexity_level={user_prefs.complexity_level}, geographic_focus={user_prefs.geographic_focus}
+TASK: Find causal relationships where one event CAUSES or INFLUENCES another event. Think broadly about:
+- Economic causality (oil prices → manufacturing costs → consumer prices)
+- Political causality (policy changes → market reactions → business decisions)  
+- Social causality (cultural events → behavioral changes → economic impacts)
+- Environmental causality (climate events → agricultural changes → food prices)
+- Technological causality (innovations → industry disruption → job market changes)
+- Geopolitical causality (conflicts → commodity prices → global markets)
 
-Return JSON array of connections with enhanced metadata:
+IMPORTANT: Every story should connect to at least one other story. Look for indirect causality chains.
+
+Return JSON array of causal connections:
 [{{
-  "source_id": "id1",
-  "target_id": "id2", 
-  "connection_type": "economic|political|social|environmental|causal|thematic|geographic|temporal",
-  "strength": 0.3-1.0,
-  "confidence": 0.4-1.0,
-  "explanation": "detailed multi-faceted explanation",
-  "keywords": ["keyword1", "keyword2", "keyword3"],
-  "geographic_overlap": {{"country": "if applicable", "region": "if applicable"}},
-  "temporal_relationship": "causation|correlation|sequence|concurrent|lagged",
-  "evidence_score": 0.4-1.0
+  "source_id": "story1_id",
+  "target_id": "story2_id", 
+  "connection_type": "causal|economic_causal|political_causal|social_causal|environmental_causal|indirect_causal",
+  "causality_strength": 0.3-1.0,
+  "evidence_score": 0.4-1.0,
+  "causal_explanation": "Detailed explanation of HOW story1 causes or influences story2",
+  "causal_chain": ["intermediate step 1", "intermediate step 2"],
+  "time_lag": "immediate|hours|days|weeks|months",
+  "keywords": ["keyword1", "keyword2", "keyword3"]
 }}]
 
-Focus on high-confidence connections (>0.5). Maximum 8 connections. Include cross-source relationships when possible."""
+FOCUS ON CAUSALITY: Prioritize connections where one event directly or indirectly CAUSES another.
+COMPREHENSIVENESS: Ensure every story connects to others - no isolated bubbles.
+Maximum 20 connections. Minimum causality_strength of 0.4."""
 
         try:
             user_message = UserMessage(text=analysis_prompt)
             response = await self.claude_chat.send_message(user_message)
             
             response_text = response.strip()
-            logger.info(f"Claude advanced analysis: {len(response_text)} chars")
+            logger.info(f"Claude causal analysis: {len(response_text)} chars")
             
             if response_text.startswith('['):
                 connections_data = json.loads(response_text)
@@ -374,33 +387,24 @@ Focus on high-confidence connections (>0.5). Maximum 8 connections. Include cros
             
             connections = []
             for conn in connections_data:
-                if all(key in conn for key in ["source_id", "target_id", "connection_type", "strength", "confidence"]):
-                    geographic_info = None
-                    if conn.get("geographic_overlap"):
-                        geo_data = conn["geographic_overlap"]
-                        geographic_info = GeographicInfo(
-                            country=geo_data.get("country"),
-                            region=geo_data.get("region")
-                        )
-                    
+                if all(key in conn for key in ["source_id", "target_id", "connection_type", "causality_strength"]):
                     connections.append(AdvancedConnection(
                         source_id=conn["source_id"],
                         target_id=conn["target_id"],
                         connection_type=conn["connection_type"],
-                        strength=float(conn["strength"]),
-                        confidence=float(conn["confidence"]),
-                        explanation=conn.get("explanation", "AI-detected connection"),
+                        strength=float(conn["causality_strength"]),
+                        confidence=float(conn.get("evidence_score", 0.7)),
+                        explanation=conn.get("causal_explanation", "AI-detected causal relationship"),
                         keywords=conn.get("keywords", []),
-                        geographic_overlap=geographic_info,
-                        temporal_relationship=conn.get("temporal_relationship"),
-                        evidence_score=float(conn.get("evidence_score", 0.5))
+                        temporal_relationship=conn.get("time_lag", "unknown"),
+                        evidence_score=float(conn.get("evidence_score", 0.7))
                     ))
             
-            logger.info(f"Generated {len(connections)} advanced connections")
+            logger.info(f"Generated {len(connections)} causal connections")
             return connections
             
         except Exception as e:
-            logger.error(f"Advanced connection analysis error: {e}")
+            logger.error(f"Causal connection analysis error: {e}")
             return []
     
     async def create_enhanced_content(self, story: Dict, complexity_level: int = 3) -> Dict[str, Any]:
