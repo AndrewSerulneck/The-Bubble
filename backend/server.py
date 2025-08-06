@@ -869,6 +869,120 @@ class UltimateNewsProcessor:
     
     def _get_source_color(self, source: str) -> str:
         return {"guardian": "#3498db", "nyt": "#2c3e50"}.get(source, "#7f8c8d")
+    
+    def _classify_story_topic(self, story: EnhancedStory) -> str:
+        """Classify story into topic clusters for better organization"""
+        section = story.section.lower()
+        title = story.title.lower()
+        entities = [e.lower() for e in story.entities]
+        
+        # Topic classification logic
+        if any(term in title for term in ['restaurant', 'food', 'dining', 'chef', 'cooking', 'recipe']):
+            return 'Restaurants & Food'
+        elif any(term in title for term in ['fashion', 'style', 'clothing', 'designer', 'runway', 'beauty']):
+            return 'Fashion & Style'
+        elif any(term in section for term in ['business', 'finance', 'economy', 'money']) or \
+             any(term in title for term in ['market', 'stock', 'economy', 'business', 'company', 'earnings', 'profit']):
+            return 'Business & Economy'
+        elif any(term in section for term in ['politics', 'government']) or \
+             any(term in title for term in ['election', 'congress', 'president', 'government', 'policy', 'vote']):
+            return 'Politics & Government'
+        elif any(term in section for term in ['culture', 'arts']) or \
+             any(term in title for term in ['art', 'museum', 'culture', 'theater', 'music', 'film', 'book']):
+            return 'Culture & Arts'
+        elif any(term in section for term in ['technology', 'tech']) or \
+             any(term in title for term in ['technology', 'tech', 'ai', 'software', 'digital', 'internet']):
+            return 'Technology'
+        elif any(term in section for term in ['environment', 'climate']) or \
+             any(term in title for term in ['climate', 'environment', 'green', 'carbon', 'renewable']):
+            return 'Environment & Climate'
+        elif any(term in section for term in ['health', 'medicine']) or \
+             any(term in title for term in ['health', 'medical', 'doctor', 'hospital', 'disease', 'treatment']):
+            return 'Health & Medicine'
+        elif any(term in section for term in ['sport', 'sports']) or \
+             any(term in title for term in ['sport', 'game', 'team', 'player', 'match', 'championship']):
+            return 'Sports'
+        elif any(term in title for term in ['war', 'conflict', 'military', 'defense', 'security', 'terrorism']):
+            return 'Security & Conflict'
+        else:
+            return 'General News'
+    
+    def _get_topic_color(self, topic: str, sentiment: float = 0.0) -> str:
+        """Get color for topic cluster with sentiment modification"""
+        base_colors = {
+            'Business & Economy': '#f39c12',
+            'Politics & Government': '#3498db', 
+            'Fashion & Style': '#e91e63',
+            'Culture & Arts': '#9c27b0',
+            'Restaurants & Food': '#ff5722',
+            'Technology': '#673ab7',
+            'Environment & Climate': '#4caf50',
+            'Health & Medicine': '#00bcd4',
+            'Sports': '#8bc34a',
+            'Security & Conflict': '#f44336',
+            'General News': '#607d8b'
+        }
+        
+        base_color = base_colors.get(topic, '#95a5a6')
+        
+        # Slight sentiment modification
+        if sentiment > 0.3:
+            return base_color  # Positive stories keep base color
+        elif sentiment < -0.3:
+            return '#d32f2f'  # Negative stories get reddish tint
+        
+        return base_color
+    
+    def _get_topic_cluster_color(self, topic: str) -> str:
+        """Get darker cluster color for topic group nodes"""
+        colors = {
+            'Business & Economy': '#d68910',
+            'Politics & Government': '#2980b9',
+            'Fashion & Style': '#c2185b',
+            'Culture & Arts': '#7b1fa2',
+            'Restaurants & Food': '#e64a19',
+            'Technology': '#512da8',
+            'Environment & Climate': '#388e3c',
+            'Health & Medicine': '#0097a7',
+            'Sports': '#689f38',
+            'Security & Conflict': '#d32f2f',
+            'General News': '#455a64'
+        }
+        return colors.get(topic, '#546e7a')
+    
+    def _get_cluster_x_position(self, topic: str) -> float:
+        """Get suggested X position for topic cluster"""
+        positions = {
+            'Business & Economy': 0.2,
+            'Politics & Government': 0.8,
+            'Fashion & Style': 0.1,
+            'Culture & Arts': 0.9,
+            'Restaurants & Food': 0.3,
+            'Technology': 0.7,
+            'Environment & Climate': 0.4,
+            'Health & Medicine': 0.6,
+            'Sports': 0.5,
+            'Security & Conflict': 0.75,
+            'General News': 0.5
+        }
+        return positions.get(topic, 0.5)
+    
+    def _get_cluster_y_position(self, topic: str) -> float:
+        """Get suggested Y position for topic cluster"""
+        positions = {
+            'Business & Economy': 0.3,
+            'Politics & Government': 0.3,
+            'Fashion & Style': 0.7,
+            'Culture & Arts': 0.7,
+            'Restaurants & Food': 0.8,
+            'Technology': 0.2,
+            'Environment & Climate': 0.5,
+            'Health & Medicine': 0.4,
+            'Sports': 0.6,
+            'Security & Conflict': 0.2,
+            'General News': 0.5
+        }
+        return positions.get(topic, 0.5)
 
 # Initialize ultimate processor
 news_processor = UltimateNewsProcessor()
