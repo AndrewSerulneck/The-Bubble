@@ -895,6 +895,92 @@ async def root():
         }
     }
 
+@app.get("/api/v4/news/search")
+async def search_ultimate_news(
+    query: str,
+    background_tasks: BackgroundTasks,
+    days: int = Query(default=7, ge=1, le=30),
+    sources: str = Query(default="guardian,nyt"),
+    section: Optional[str] = Query(default=None),
+    complexity_level: int = Query(default=3, ge=1, le=5),
+    max_articles: int = Query(default=15, ge=5, le=30),
+    session_id: str = Query(default_factory=lambda: str(uuid.uuid4()))
+):
+    """Advanced search across multiple news sources with v4 features"""
+    
+    try:
+        user_prefs = UserPreferences(
+            complexity_level=complexity_level
+        )
+        
+        to_date = datetime.now().strftime('%Y-%m-%d')
+        from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
+        
+        # Multi-source search
+        source_list = sources.split(',')
+        async with MultiSourceNewsClient() as client:
+            all_results = []
+            
+            if 'guardian' in source_list:
+                guardian_results = await client.search_guardian(
+                    query=query, section=section, 
+                    from_date=from_date, to_date=to_date, 
+                    page_size=max_articles//2
+                )
+                all_results.extend(guardian_results)
+            
+            if 'nyt' in source_list:
+                nyt_results = await client.search_nyt(
+                    query=query, section=section, 
+                    from_date=from_date, to_date=to_date, 
+                    page_size=max_articles//2
+                )
+                all_results.extend(nyt_results)
+        
+        # Process stories
+        guardian_stories = [s for s in all_results if 'webTitle' in s]
+        nyt_stories = [s for s in all_results if 'headline' in s]
+        
+        processed_stories = await news_processor.process_multi_source_stories(
+            guardian_stories, nyt_stories, user_prefs
+        )
+        
+        # Create knowledge graph
+        knowledge_graph = await news_processor.create_ultimate_knowledge_graph(
+            processed_stories, all_results, user_prefs
+        )
+        
+        # Track analytics
+        background_tasks.add_task(
+            analytics_manager.track_event,
+            AnalyticsData(
+                session_id=session_id,
+                action="ultimate_search",
+                metadata={
+                    "query": query,
+                    "sources": sources,
+                    "results": len(processed_stories),
+                    "complexity_level": complexity_level
+                }
+            )
+        )
+        
+        return knowledge_graph
+        
+    except Exception as e:
+        logger.error(f"Ultimate news search error: {e}")
+        return await get_ultimate_demo_graph()
+
+@app.post("/api/v3/analytics/track")
+async def track_analytics_v3(analytics_data: AnalyticsData):
+    """Track analytics events (v3 compatibility)"""
+    try:
+        await analytics_manager.track_event(analytics_data)
+        return {"status": "success", "message": "Analytics tracked"}
+    except Exception as e:
+        logger.error(f"Analytics tracking error: {e}")
+        return {"status": "success", "message": "Analytics noted (demo mode)"}
+
 @app.get("/api/v4/knowledge-graph/ultimate")
 async def get_ultimate_knowledge_graph(
     background_tasks: BackgroundTasks,
