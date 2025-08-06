@@ -231,42 +231,40 @@ const App = () => {
 
     if (!data.nodes || data.nodes.length === 0) return;
 
-    const width = 1400;  // Reduced from 1600
-    const height = 800;  // Reduced from 1000
+    const width = 1400;
+    const height = 800;
     
     svg.attr('width', width).attr('height', height);
 
-    // Simplified, faster force simulation
+    // Filter article nodes for rendering
+    const articleNodes = data.nodes.filter(d => d.type === 'article');
+    const clusterNodes = data.nodes.filter(d => d.type === 'topic_cluster');
+    
+    console.log(`Rendering ${articleNodes.length} article nodes and ${clusterNodes.length} cluster nodes`);
+
+    // Simplified force simulation
     const simulation = d3.forceSimulation(data.nodes)
-      .force('link', d3.forceLink(data.edges)
-        .id(d => d.id)
-        .distance(120)  // Fixed distance for speed
-        .strength(0.6)  // Fixed strength for speed
-      )
+      .force('link', d3.forceLink(data.edges).id(d => d.id).distance(120).strength(0.6))
       .force('charge', d3.forceManyBody().strength(-400))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(d => (d.size || 25) + 8))
-      .alpha(0.3)  // Start with lower alpha for faster settling
-      .alphaDecay(0.05); // Faster decay
+      .force('collision', d3.forceCollide().radius(d => (d.size || 25) + 8));
 
-    // Container with simplified zoom
     const container = svg.append('g');
     const zoom = d3.zoom()
-      .scaleExtent([0.5, 3])  // Reduced zoom range for performance
+      .scaleExtent([0.5, 3])
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
       });
     
     svg.call(zoom);
 
-    // Simplified links - no complex hover effects initially
+    // Links
     const links = container.selectAll('.link')
       .data(data.edges)
       .enter()
       .append('line')
       .attr('class', 'link')
       .style('stroke', d => {
-        if (d.type === 'belongs_to_cluster') return '#e0e0e0';
         const causalColors = {
           'causal': '#e74c3c',
           'economic_causal': '#f39c12',
@@ -277,10 +275,10 @@ const App = () => {
         };
         return causalColors[d.type] || '#95a5a6';
       })
-      .style('stroke-width', d => Math.min(8, d.width || 2))  // Cap width for performance
-      .style('stroke-opacity', d => d.opacity || 0.6);
+      .style('stroke-width', d => Math.min(8, d.width || 2))
+      .style('stroke-opacity', 0.6);
 
-    // Simplified nodes - reduced DOM complexity
+    // All nodes group
     const nodes = container.selectAll('.node')
       .data(data.nodes)
       .enter()
@@ -288,76 +286,103 @@ const App = () => {
       .attr('class', 'node')
       .style('cursor', 'pointer');
 
-    // Topic cluster nodes - simplified
+    // Topic cluster circles
     nodes.filter(d => d.type === 'topic_cluster')
       .append('circle')
-      .attr('r', d => Math.min(50, d.size || 40))  // Cap size
+      .attr('r', d => Math.min(50, d.size || 40))
       .style('fill', d => d.color)
       .style('opacity', 0.15)
       .style('stroke', d => d.color)
       .style('stroke-width', 1);
 
-    // Article nodes - optimized for speed
-    const articleNodes = nodes.filter(d => d.type === 'article');
+    // Article bubbles - FIXED
+    const articleNodeGroups = nodes.filter(d => d.type === 'article');
     
-    articleNodes.append('circle')
-      .attr('r', d => Math.max(25, Math.min(50, d.title.length * 0.6)))  // Smaller, capped sizes
+    articleNodeGroups.append('circle')
+      .attr('r', d => {
+        const titleLength = (d.title || '').length;
+        return Math.max(25, Math.min(50, titleLength * 0.6));
+      })
       .style('fill', d => d.color || '#3498db')
       .style('stroke', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
       .style('stroke-width', 2)
       .style('opacity', 0.9);
 
-    // Simplified source indicators
-    articleNodes.append('circle')
+    // Source indicators
+    articleNodeGroups.append('circle')
       .attr('r', 8)
-      .attr('cx', d => Math.max(25, Math.min(50, d.title.length * 0.6)) - 6)
-      .attr('cy', d => -(Math.max(25, Math.min(50, d.title.length * 0.6)) - 6))
+      .attr('cx', d => {
+        const radius = Math.max(25, Math.min(50, (d.title || '').length * 0.6));
+        return radius - 6;
+      })
+      .attr('cy', d => {
+        const radius = Math.max(25, Math.min(50, (d.title || '').length * 0.6));
+        return -(radius - 6);
+      })
       .style('fill', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
       .style('stroke', '#fff')
       .style('stroke-width', 2);
 
-    // Simplified headlines using text instead of foreignObject for better performance
-    articleNodes.append('text')
+    // Headlines - FIXED
+    articleNodeGroups.append('text')
       .text(d => {
-        // Intelligent truncation for performance
-        const title = d.title || '';
+        const title = d.title || 'Untitled';
         return title.length > 60 ? title.substring(0, 57) + '...' : title;
       })
       .style('font-size', '11px')
       .style('font-weight', '600')
       .style('fill', '#2c3e50')
       .style('text-anchor', 'middle')
-      .attr('dy', d => Math.max(25, Math.min(50, d.title.length * 0.6)) + 20)
+      .attr('dy', d => {
+        const radius = Math.max(25, Math.min(50, (d.title || '').length * 0.6));
+        return radius + 20;
+      })
       .style('pointer-events', 'none')
-      .call(wrap, 120); // Text wrapping function
+      .each(function(d) {
+        const text = d3.select(this);
+        const title = d.title || 'Untitled';
+        if (title.length > 30) {
+          // Simple text wrapping
+          const words = title.split(' ');
+          const line1 = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+          const line2 = words.slice(Math.ceil(words.length / 2)).join(' ');
+          
+          text.text(line1);
+          if (line2) {
+            text.append('tspan')
+              .attr('x', 0)
+              .attr('dy', '1.2em')
+              .text(line2.length > 30 ? line2.substring(0, 27) + '...' : line2);
+          }
+        }
+      });
 
-    // Topic cluster labels - simplified
+    // Topic cluster labels
     nodes.filter(d => d.type === 'topic_cluster')
       .append('text')
-      .text(d => `${d.title} (${d.story_count})`)
+      .text(d => `${d.title} (${d.story_count || 0})`)
       .style('font-size', '12px')
       .style('font-weight', 'bold')
       .style('fill', d => d.color)
       .style('text-anchor', 'middle')
       .style('pointer-events', 'none');
 
-    // Optimized hover effects - only for article nodes
-    articleNodes
+    // Hover effects
+    articleNodeGroups
       .on('mouseover', function(event, d) {
-        // Simplified hover effect
         d3.select(this).select('circle')
           .transition().duration(150)
-          .attr('r', d => Math.max(30, Math.min(60, d.title.length * 0.8)))
-          .style('stroke-width', 3);
+          .style('stroke-width', 4)
+          .style('opacity', 1);
         
-        // Simple tooltip - no complex DOM manipulation
+        // Simple tooltip
         const tooltip = container.append('g')
           .attr('class', 'simple-tooltip')
           .attr('transform', `translate(${d.x + 40}, ${d.y - 30})`);
         
         tooltip.append('rect')
-          .attr('width', 300)
-          .attr('height', 80)
+          .attr('width', 250)
+          .attr('height', 60)
           .attr('rx', 6)
           .style('fill', 'rgba(0,0,0,0.9)')
           .style('stroke', d.source === 'nyt' ? '#2c3e50' : '#3498db');
@@ -372,14 +397,7 @@ const App = () => {
         
         tooltip.append('text')
           .attr('x', 10)
-          .attr('y', 40)
-          .style('fill', '#fff')
-          .style('font-size', '11px')
-          .text(d.title.substring(0, 35) + (d.title.length > 35 ? '...' : ''));
-        
-        tooltip.append('text')
-          .attr('x', 10)
-          .attr('y', 65)
+          .attr('y', 45)
           .style('fill', '#4CAF50')
           .style('font-size', '10px')
           .text('👆 Click for details');
@@ -387,8 +405,8 @@ const App = () => {
       .on('mouseout', function(event, d) {
         d3.select(this).select('circle')
           .transition().duration(100)
-          .attr('r', d => Math.max(25, Math.min(50, d.title.length * 0.6)))
-          .style('stroke-width', 2);
+          .style('stroke-width', 2)
+          .style('opacity', 0.9);
         
         container.selectAll('.simple-tooltip').remove();
       })
@@ -401,7 +419,7 @@ const App = () => {
         });
       });
 
-    // Simplified drag behavior
+    // Drag behavior
     const drag = d3.drag()
       .on('start', (event, d) => {
         if (!event.active) simulation.alphaTarget(0.1).restart();
@@ -415,9 +433,9 @@ const App = () => {
         d.fx = null; d.fy = null;
       });
 
-    articleNodes.call(drag);
+    articleNodeGroups.call(drag);
 
-    // Optimized simulation tick
+    // Simulation tick
     simulation.on('tick', () => {
       links
         .attr('x1', d => d.source.x)
@@ -427,37 +445,7 @@ const App = () => {
 
       nodes.attr('transform', d => `translate(${d.x},${d.y})`);
     });
-
-    // Stop simulation early for better performance
-    simulation.tick(50); // Pre-compute 50 ticks
-    simulation.stop();
   };
-
-  // Text wrapping helper function
-  function wrap(text, width) {
-    text.each(function() {
-      const text = d3.select(this);
-      const words = text.text().split(/\s+/).reverse();
-      let word;
-      let line = [];
-      let lineNumber = 0;
-      const lineHeight = 1.1;
-      const y = text.attr("y");
-      const dy = parseFloat(text.attr("dy"));
-      let tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
-      
-      while (word = words.pop()) {
-        line.push(word);
-        tspan.text(line.join(" "));
-        if (tspan.node().getComputedTextLength() > width) {
-          line.pop();
-          tspan.text(line.join(" "));
-          line = [word];
-          tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
-        }
-      }
-    });
-  }
 
   return (
     <div className="app">
