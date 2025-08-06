@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 
 class FocusedAPITester:
-    def __init__(self, base_url="https://0951be95-b7b5-45fe-8a88-30c1c13d6686.preview.emergentagent.com"):
+    def __init__(self, base_url="https://9bb23194-cb06-4a30-80b8-000a0e730972.preview.emergentagent.com"):
         self.base_url = base_url
         self.tests_run = 0
         self.tests_passed = 0
