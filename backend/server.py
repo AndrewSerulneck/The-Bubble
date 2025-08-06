@@ -1319,6 +1319,15 @@ async def get_ultimate_knowledge_graph(
             user_prefs
         )
         
+        # Fallback to regular processing if fast fails
+        if not processed_stories:
+            logger.info("Fast processing failed, using regular processing")
+            processed_stories = await news_processor.process_multi_source_stories(
+                guardian_stories[:6], 
+                nyt_stories[:6], 
+                user_prefs
+            )
+        
         # Create optimized knowledge graph
         knowledge_graph = await news_processor.create_ultimate_knowledge_graph(
             processed_stories, raw_stories, user_prefs
