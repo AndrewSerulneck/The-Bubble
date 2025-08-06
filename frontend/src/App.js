@@ -130,7 +130,7 @@ const App = () => {
 
   const loadProductionDemo = async () => {
     try {
-      const response = await fetch(`${backendUrl}/api/v3/demo/production`);
+      const response = await fetch(`${backendUrl}/api/v4/demo/ultimate`);
       const data = await response.json();
       setGraphData(data);
       renderAdvancedGraph(data);
