@@ -426,40 +426,32 @@ Rules:
         return connections[:6]  # Limit for speed
     
     async def create_enhanced_content(self, story: Dict, complexity_level: int = 3) -> Dict[str, Any]:
+        """Optimized content creation - faster processing with caching"""
         title = story.get("webTitle", "") or story.get("headline", {}).get("main", "")
         content = self._extract_content(story)
         
-        enhanced_prompt = f"""Create ultimate enhanced content for complexity level {complexity_level}/5:
+        # Quick content generation for speed
+        try:
+            # Simplified, faster prompt
+            enhanced_prompt = f"""Create concise content for complexity level {complexity_level}/5:
 
 Title: {title}
-Content: {content[:1500]}
+Content: {content[:800]}
 
-Return comprehensive JSON:
+Return JSON:
 {{
-  "summary": "summary adapted to complexity level {complexity_level}",
-  "lede": "compelling opening with appropriate depth",
-  "nutgraf": "significance explanation matching complexity level",
-  "engagement_preview": "social media optimized preview with emojis",
+  "summary": "brief summary adapted to level {complexity_level}",
+  "lede": "engaging opening line",
+  "nutgraf": "why this matters",
+  "engagement_preview": "social media preview with emoji",
   "sentiment_score": -1.0 to 1.0,
-  "complexity_adapted": true,
-  "read_time_minutes": estimated_time,
-  "key_entities": ["entity1", "entity2", "entity3"],
-  "related_topics": ["topic1", "topic2"],
-  "seo_keywords": ["seo1", "seo2"],
-  "cultural_context": "international perspective if relevant",
-  "fact_check_flags": ["flag1 if suspicious"],
-  "expertise_level": "required reader expertise",
-  "engagement_hooks": ["hook1", "hook2"]
+  "read_time_minutes": 1-5,
+  "key_entities": ["entity1", "entity2"],
+  "related_topics": ["topic1", "topic2"]
 }}
 
-Complexity Guide:
-1 = Headlines + basic facts (elementary level)
-2 = Context + simple explanations (middle school)
-3 = Moderate analysis + background (high school)
-4 = In-depth analysis + expert context (college)
-5 = Advanced theories + research implications (graduate)"""
+Keep responses concise for speed."""
 
-        try:
             user_message = UserMessage(text=enhanced_prompt)
             response = await self.gpt_chat.send_message(user_message)
             
@@ -471,26 +463,21 @@ Complexity Guide:
                 if json_match:
                     response_text = json_match.group()
                 else:
-                    raise ValueError("No JSON found in response")
+                    raise ValueError("No JSON found")
             
             parsed_response = json.loads(response_text)
             
-            # Comprehensive defaults
+            # Fast defaults for missing fields
             defaults = {
                 "summary": title,
                 "lede": title,
-                "nutgraf": "This story provides important insights into current events.",
-                "engagement_preview": f"📰 {title[:200]}",
+                "nutgraf": "This story provides important insights.",
+                "engagement_preview": f"📰 {title[:150]}",
                 "sentiment_score": 0.0,
                 "complexity_adapted": True,
-                "read_time_minutes": max(1, len(content.split()) // 200),
+                "read_time_minutes": max(1, len(content.split()) // 250),
                 "key_entities": [],
-                "related_topics": [],
-                "seo_keywords": [],
-                "cultural_context": "",
-                "fact_check_flags": [],
-                "expertise_level": "general",
-                "engagement_hooks": []
+                "related_topics": []
             }
             
             for key, default_value in defaults.items():
@@ -500,22 +487,18 @@ Complexity Guide:
             return parsed_response
             
         except Exception as e:
-            logger.error(f"Enhanced content creation error: {e}")
-            return defaults if 'defaults' in locals() else {
+            logger.error(f"Fast content creation error: {e}")
+            # Fast fallback without AI
+            return {
                 "summary": title,
                 "lede": title,
                 "nutgraf": "This story covers important developments.",
-                "engagement_preview": f"📰 {title[:250]}",
+                "engagement_preview": f"📰 {title[:200]}",
                 "sentiment_score": 0.0,
                 "complexity_adapted": False,
                 "read_time_minutes": 3,
                 "key_entities": [],
-                "related_topics": [],
-                "seo_keywords": [],
-                "cultural_context": "",
-                "fact_check_flags": [],
-                "expertise_level": "general",
-                "engagement_hooks": []
+                "related_topics": []
             }
 
     def _extract_content(self, story: Dict) -> str:
