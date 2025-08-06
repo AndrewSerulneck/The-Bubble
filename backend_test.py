@@ -273,6 +273,303 @@ class NewsKnowledgeGraphTester:
         
         return success
 
+    def test_ultimate_health_check(self):
+        """Test ultimate health check endpoint with NYT API key detection"""
+        success, data = self.run_test(
+            "Ultimate Health Check",
+            "GET", 
+            "/api/health/ultimate"
+        )
+        
+        if success:
+            # Verify ultimate health check response structure
+            required_fields = ['status', 'version', 'timestamp', 'services', 'api_sources', 'features']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test("Ultimate Health Check Structure", False, f"Missing fields: {missing_fields}")
+                return False
+            else:
+                self.log_test("Ultimate Health Check Structure", True, "All required fields present")
+                
+                # Check API sources
+                api_sources = data.get('api_sources', {})
+                guardian_available = api_sources.get('guardian', False)
+                nyt_available = api_sources.get('nyt', False)
+                
+                print(f"   Guardian API: {guardian_available}")
+                print(f"   NYT API: {nyt_available}")
+                print(f"   Version: {data.get('version')}")
+                print(f"   Status: {data.get('status')}")
+                
+                # Verify NYT API key is detected
+                if nyt_available:
+                    self.log_test("NYT API Key Detection", True, "NYT API key properly detected")
+                else:
+                    self.log_test("NYT API Key Detection", False, "NYT API key not detected or invalid")
+                
+                # Check features
+                features = data.get('features', {})
+                expected_features = [
+                    'multi_source_integration', 'advanced_ai_analysis', 'real_time_updates',
+                    'geographic_analysis', 'temporal_analysis', 'sentiment_analysis',
+                    'influence_metrics', 'trending_detection', 'ultimate_knowledge_graph'
+                ]
+                
+                missing_features = [f for f in expected_features if not features.get(f, False)]
+                if missing_features:
+                    self.log_test("Ultimate Features Check", False, f"Missing features: {missing_features}")
+                else:
+                    self.log_test("Ultimate Features Check", True, "All ultimate features enabled")
+                
+                return True
+        
+        return success
+
+    def test_nyt_api_integration(self):
+        """Test NYT API integration specifically"""
+        print("\n🔍 Testing NYT API Integration...")
+        
+        # Test NYT-only source
+        success, data = self.run_test(
+            "NYT API Integration (NYT Only)",
+            "GET",
+            "/api/v4/knowledge-graph/ultimate",
+            params={
+                'sources': 'nyt',
+                'days': 3,
+                'max_articles': 10,
+                'complexity_level': 3
+            },
+            timeout=45
+        )
+        
+        if success:
+            metadata = data.get('metadata', {})
+            nodes = data.get('nodes', [])
+            
+            # Check for NYT articles
+            nyt_articles = [n for n in nodes if n.get('type') == 'article' and n.get('source') == 'nyt']
+            
+            if nyt_articles:
+                self.log_test("NYT Articles Retrieved", True, f"Found {len(nyt_articles)} NYT articles")
+                
+                # Check NYT article structure
+                sample_nyt = nyt_articles[0]
+                required_nyt_fields = ['id', 'title', 'summary', 'lede', 'nutgraf', 'source', 'url']
+                missing_nyt_fields = [field for field in required_nyt_fields if not sample_nyt.get(field)]
+                
+                if missing_nyt_fields:
+                    self.log_test("NYT Article Structure", False, f"Missing fields: {missing_nyt_fields}")
+                else:
+                    self.log_test("NYT Article Structure", True, "NYT article structure valid")
+                    print(f"   Sample NYT Title: {sample_nyt.get('title', '')[:80]}...")
+                    print(f"   NYT URL: {sample_nyt.get('url', '')[:60]}...")
+            else:
+                self.log_test("NYT Articles Retrieved", False, "No NYT articles found")
+                return False
+            
+            # Check source node
+            nyt_source_node = next((n for n in nodes if n.get('id') == 'source_nyt'), None)
+            if nyt_source_node:
+                self.log_test("NYT Source Node", True, "NYT source node present")
+            else:
+                self.log_test("NYT Source Node", False, "NYT source node missing")
+        
+        return success
+
+    def test_multi_source_integration(self):
+        """Test multi-source integration (Guardian + NYT)"""
+        print("\n🔍 Testing Multi-Source Integration...")
+        
+        success, data = self.run_test(
+            "Multi-Source Integration (Guardian + NYT)",
+            "GET",
+            "/api/v4/knowledge-graph/ultimate",
+            params={
+                'sources': 'guardian,nyt',
+                'days': 3,
+                'max_articles': 20,
+                'complexity_level': 3
+            },
+            timeout=60
+        )
+        
+        if success:
+            nodes = data.get('nodes', [])
+            metadata = data.get('metadata', {})
+            
+            # Check for both source types
+            guardian_articles = [n for n in nodes if n.get('type') == 'article' and n.get('source') == 'guardian']
+            nyt_articles = [n for n in nodes if n.get('type') == 'article' and n.get('source') == 'nyt']
+            
+            print(f"   Guardian articles: {len(guardian_articles)}")
+            print(f"   NYT articles: {len(nyt_articles)}")
+            print(f"   Total articles: {metadata.get('total_articles', 0)}")
+            
+            if guardian_articles and nyt_articles:
+                self.log_test("Multi-Source Articles", True, f"Both sources present: {len(guardian_articles)} Guardian, {len(nyt_articles)} NYT")
+            elif guardian_articles:
+                self.log_test("Multi-Source Articles", False, "Only Guardian articles found, NYT missing")
+            elif nyt_articles:
+                self.log_test("Multi-Source Articles", False, "Only NYT articles found, Guardian missing")
+            else:
+                self.log_test("Multi-Source Articles", False, "No articles from either source")
+                return False
+            
+            # Check for cross-source connections
+            edges = data.get('edges', [])
+            cross_source_connections = []
+            
+            for edge in edges:
+                source_node = next((n for n in nodes if n.get('id') == edge.get('source')), None)
+                target_node = next((n for n in nodes if n.get('id') == edge.get('target')), None)
+                
+                if (source_node and target_node and 
+                    source_node.get('type') == 'article' and target_node.get('type') == 'article' and
+                    source_node.get('source') != target_node.get('source')):
+                    cross_source_connections.append(edge)
+            
+            if cross_source_connections:
+                self.log_test("Cross-Source Connections", True, f"Found {len(cross_source_connections)} cross-source connections")
+                
+                # Check connection quality
+                sample_connection = cross_source_connections[0]
+                if all(field in sample_connection for field in ['type', 'strength', 'confidence', 'explanation']):
+                    self.log_test("Cross-Source Connection Quality", True, "High-quality cross-source connections")
+                    print(f"   Sample connection type: {sample_connection.get('type')}")
+                    print(f"   Connection strength: {sample_connection.get('strength')}")
+                    print(f"   Connection confidence: {sample_connection.get('confidence')}")
+                else:
+                    self.log_test("Cross-Source Connection Quality", False, "Missing connection metadata")
+            else:
+                self.log_test("Cross-Source Connections", False, "No cross-source connections found")
+        
+        return success
+
+    def test_complexity_levels(self):
+        """Test different complexity levels (1-5)"""
+        print("\n🔍 Testing Complexity Level Features...")
+        
+        complexity_results = {}
+        
+        for level in range(1, 6):
+            success, data = self.run_test(
+                f"Complexity Level {level}",
+                "GET",
+                "/api/v4/knowledge-graph/ultimate",
+                params={
+                    'sources': 'guardian,nyt',
+                    'days': 2,
+                    'max_articles': 8,
+                    'complexity_level': level
+                },
+                timeout=45
+            )
+            
+            if success:
+                nodes = data.get('nodes', [])
+                metadata = data.get('metadata', {})
+                
+                # Check if complexity level is reflected in user preferences
+                user_prefs = metadata.get('user_preferences', {})
+                if user_prefs.get('complexity_level') == level:
+                    self.log_test(f"Complexity Level {level} - Metadata", True, f"Complexity level {level} properly set")
+                else:
+                    self.log_test(f"Complexity Level {level} - Metadata", False, f"Expected {level}, got {user_prefs.get('complexity_level')}")
+                
+                # Check article complexity adaptation
+                article_nodes = [n for n in nodes if n.get('type') == 'article']
+                if article_nodes:
+                    sample_article = article_nodes[0]
+                    article_complexity = sample_article.get('complexity_level', 0)
+                    
+                    if article_complexity == level:
+                        self.log_test(f"Complexity Level {level} - Article Adaptation", True, f"Articles adapted to level {level}")
+                    else:
+                        self.log_test(f"Complexity Level {level} - Article Adaptation", False, f"Expected {level}, got {article_complexity}")
+                    
+                    # Store results for comparison
+                    complexity_results[level] = {
+                        'summary_length': len(sample_article.get('summary', '')),
+                        'lede_length': len(sample_article.get('lede', '')),
+                        'nutgraf_length': len(sample_article.get('nutgraf', '')),
+                        'read_time': sample_article.get('read_time_minutes', 0)
+                    }
+                    
+                    print(f"   Level {level} - Summary length: {complexity_results[level]['summary_length']} chars")
+                    print(f"   Level {level} - Read time: {complexity_results[level]['read_time']} minutes")
+            else:
+                return False
+        
+        # Verify complexity progression
+        if len(complexity_results) >= 3:
+            # Check if higher complexity levels generally have longer content
+            level_1_summary = complexity_results.get(1, {}).get('summary_length', 0)
+            level_5_summary = complexity_results.get(5, {}).get('summary_length', 0)
+            
+            if level_5_summary > level_1_summary:
+                self.log_test("Complexity Progression", True, "Higher complexity levels have more detailed content")
+            else:
+                self.log_test("Complexity Progression", False, "No clear complexity progression detected")
+        
+        return True
+
+    def test_ultimate_demo_endpoint(self):
+        """Test ultimate demo endpoint"""
+        success, data = self.run_test(
+            "Ultimate Demo Endpoint",
+            "GET",
+            "/api/v4/demo/ultimate"
+        )
+        
+        if success:
+            # Check demo structure
+            required_fields = ['nodes', 'edges', 'metadata']
+            missing_fields = [field for field in required_fields if field not in data]
+            
+            if missing_fields:
+                self.log_test("Ultimate Demo Structure", False, f"Missing fields: {missing_fields}")
+                return False
+            
+            nodes = data.get('nodes', [])
+            edges = data.get('edges', [])
+            metadata = data.get('metadata', {})
+            
+            # Check for ultimate features in demo
+            advanced_features = metadata.get('advanced_features', {})
+            expected_features = [
+                'multi_source', 'geographic_analysis', 'temporal_analysis',
+                'sentiment_analysis', 'complexity_adaptation', 'confidence_scoring',
+                'influence_metrics', 'real_time_analytics'
+            ]
+            
+            missing_demo_features = [f for f in expected_features if not advanced_features.get(f, False)]
+            if missing_demo_features:
+                self.log_test("Ultimate Demo Features", False, f"Missing demo features: {missing_demo_features}")
+            else:
+                self.log_test("Ultimate Demo Features", True, "All ultimate features present in demo")
+            
+            # Check for trending topics
+            trending_topics = metadata.get('trending_topics', [])
+            if trending_topics:
+                self.log_test("Demo Trending Topics", True, f"Found {len(trending_topics)} trending topics")
+            else:
+                self.log_test("Demo Trending Topics", False, "No trending topics in demo")
+            
+            # Check geographic insights
+            geographic_insights = metadata.get('geographic_insights', {})
+            if geographic_insights:
+                self.log_test("Demo Geographic Insights", True, "Geographic insights present")
+            else:
+                self.log_test("Demo Geographic Insights", False, "No geographic insights in demo")
+            
+            print(f"   Demo nodes: {len(nodes)}")
+            print(f"   Demo edges: {len(edges)}")
+            print(f"   Demo version: {metadata.get('version')}")
+        
+        return success
+
     def run_all_tests(self):
         """Run all backend tests"""
         print("🚀 Starting News Knowledge Graph Backend Tests")
