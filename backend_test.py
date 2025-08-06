@@ -10,6 +10,7 @@ class NewsKnowledgeGraphTester:
         self.tests_run = 0
         self.tests_passed = 0
         self.test_results = []
+        self.nyt_api_key = "nfc8xuDu40fzC0j9"  # NYT API key from review request
 
     def log_test(self, name: str, success: bool, details: str = ""):
         """Log test result"""
