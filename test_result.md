@@ -207,3 +207,5 @@ test_plan:
 agent_communication:
   - agent: "main"
     message: "NYT API key added to backend .env. Both NYT integration and complexity features appear to be already implemented in the codebase. Need to test backend API endpoints to verify functionality, especially the multi-source integration and complexity-adapted content generation."
+  - agent: "main"
+    message: "CRITICAL ISSUE: NYT API key 'nfc8xuDu40fzC0j9' is returning 401 Unauthorized errors. The key may be invalid, expired, or lack proper permissions for the NYT Article Search API. Please verify the API key with NYT developer account. Meanwhile, Guardian API and complexity features are working perfectly. Frontend updated to use enhanced v4 endpoints."
