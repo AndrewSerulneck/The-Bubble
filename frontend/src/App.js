@@ -231,64 +231,35 @@ const App = () => {
 
     if (!data.nodes || data.nodes.length === 0) return;
 
-    const width = 1600;
-    const height = 1000;
+    const width = 1400;  // Reduced from 1600
+    const height = 800;  // Reduced from 1000
     
     svg.attr('width', width).attr('height', height);
 
-    // Enhanced force simulation with topic clustering
+    // Simplified, faster force simulation
     const simulation = d3.forceSimulation(data.nodes)
       .force('link', d3.forceLink(data.edges)
         .id(d => d.id)
-        .distance(d => {
-          if (d.type === 'belongs_to_cluster') return 80;
-          if (d.is_causal) return 150 + (1 - d.strength) * 100;
-          return 200;
-        })
-        .strength(d => {
-          if (d.type === 'belongs_to_cluster') return 0.3;
-          if (d.is_causal) return d.strength * 0.8;
-          return 0.4;
-        })
+        .distance(120)  // Fixed distance for speed
+        .strength(0.6)  // Fixed strength for speed
       )
-      .force('charge', d3.forceManyBody()
-        .strength(d => {
-          if (d.type === 'article') return -500;
-          if (d.type === 'topic_cluster') return -800;
-          return -300;
-        })
-      )
+      .force('charge', d3.forceManyBody().strength(-400))
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide()
-        .radius(d => (d.size || 25) + 10)
-      )
-      // Topic clustering forces
-      .force('cluster', d3.forceX(d => {
-        if (d.type === 'article' && d.cluster_x) {
-          return d.cluster_x * width;
-        }
-        return width / 2;
-      }).strength(d => d.type === 'article' ? 0.1 : 0))
-      .force('cluster_y', d3.forceY(d => {
-        if (d.type === 'article' && d.cluster_y) {
-          return d.cluster_y * height;
-        }
-        return height / 2;
-      }).strength(d => d.type === 'article' ? 0.1 : 0));
+      .force('collision', d3.forceCollide().radius(d => (d.size || 25) + 8))
+      .alpha(0.3)  // Start with lower alpha for faster settling
+      .alphaDecay(0.05); // Faster decay
 
-    // Container with zoom
+    // Container with simplified zoom
     const container = svg.append('g');
-
-    // Enhanced zoom behavior
     const zoom = d3.zoom()
-      .scaleExtent([0.3, 5])
+      .scaleExtent([0.5, 3])  // Reduced zoom range for performance
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
       });
     
     svg.call(zoom);
 
-    // Enhanced links with causality visualization
+    // Simplified links - no complex hover effects initially
     const links = container.selectAll('.link')
       .data(data.edges)
       .enter()
@@ -296,8 +267,6 @@ const App = () => {
       .attr('class', 'link')
       .style('stroke', d => {
         if (d.type === 'belongs_to_cluster') return '#e0e0e0';
-        
-        // Causal relationship colors
         const causalColors = {
           'causal': '#e74c3c',
           'economic_causal': '#f39c12',
@@ -308,63 +277,10 @@ const App = () => {
         };
         return causalColors[d.type] || '#95a5a6';
       })
-      .style('stroke-width', d => d.width || 2)
-      .style('stroke-opacity', d => d.opacity || 0.6)
-      .style('stroke-dasharray', d => d.stroke_style === 'dashed' ? '8,4' : 'none')
-      .on('mouseover', function(event, d) {
-        if (d.explanation && d.is_causal) {
-          // Enhanced causality tooltip
-          const tooltip = container.append('g')
-            .attr('class', 'causality-tooltip')
-            .attr('transform', `translate(${event.offsetX || 0}, ${event.offsetY || 0})`);
-          
-          const rect = tooltip.append('rect')
-            .attr('width', 400)
-            .attr('height', 100)
-            .attr('rx', 10)
-            .style('fill', 'rgba(0,0,0,0.95)')
-            .style('stroke', d.is_causal ? '#e74c3c' : '#fff')
-            .style('stroke-width', 2);
-          
-          tooltip.append('text')
-            .attr('x', 15)
-            .attr('y', 25)
-            .style('fill', '#fff')
-            .style('font-size', '14px')
-            .style('font-weight', 'bold')
-            .text(`🔗 ${d.causal_indicator || '→'} CAUSAL CONNECTION`);
-          
-          tooltip.append('text')
-            .attr('x', 15)
-            .attr('y', 45)
-            .style('fill', '#f39c12')
-            .style('font-size', '11px')
-            .text(`Strength: ${(d.strength * 100).toFixed(0)}% | Confidence: ${(d.confidence * 100).toFixed(0)}%`);
-          
-          const explanation = d.explanation.length > 55 
-            ? d.explanation.substring(0, 52) + '...' 
-            : d.explanation;
-          
-          tooltip.append('text')
-            .attr('x', 15)
-            .attr('y', 70)
-            .style('fill', '#fff')
-            .style('font-size', '11px')
-            .text(explanation);
-            
-          tooltip.append('text')
-            .attr('x', 15)
-            .attr('y', 85)
-            .style('fill', '#27ae60')
-            .style('font-size', '10px')
-            .text('Click story bubbles for detailed analysis');
-        }
-      })
-      .on('mouseout', function() {
-        container.selectAll('.causality-tooltip').remove();
-      });
+      .style('stroke-width', d => Math.min(8, d.width || 2))  // Cap width for performance
+      .style('stroke-opacity', d => d.opacity || 0.6);
 
-    // Enhanced nodes with full headlines and expandable summaries
+    // Simplified nodes - reduced DOM complexity
     const nodes = container.selectAll('.node')
       .data(data.nodes)
       .enter()
@@ -372,228 +288,136 @@ const App = () => {
       .attr('class', 'node')
       .style('cursor', 'pointer');
 
-    // Topic cluster nodes (background circles)
+    // Topic cluster nodes - simplified
     nodes.filter(d => d.type === 'topic_cluster')
       .append('circle')
-      .attr('r', d => d.size || 60)
+      .attr('r', d => Math.min(50, d.size || 40))  // Cap size
       .style('fill', d => d.color)
-      .style('opacity', 0.2)
+      .style('opacity', 0.15)
       .style('stroke', d => d.color)
-      .style('stroke-width', 2)
-      .style('stroke-dasharray', '5,5');
+      .style('stroke-width', 1);
 
-    // Article node circles - larger to accommodate full headlines
-    nodes.filter(d => d.type === 'article')
-      .append('circle')
-      .attr('r', d => Math.max(30, Math.min(80, d.title.length * 0.8)))
+    // Article nodes - optimized for speed
+    const articleNodes = nodes.filter(d => d.type === 'article');
+    
+    articleNodes.append('circle')
+      .attr('r', d => Math.max(25, Math.min(50, d.title.length * 0.6)))  // Smaller, capped sizes
       .style('fill', d => d.color || '#3498db')
-      .style('stroke', d => {
-        if (d.source === 'nyt') return '#2c3e50';
-        if (d.source === 'guardian') return '#3498db';
-        return '#fff';
-      })
-      .style('stroke-width', 3)
-      .style('opacity', 0.9)
-      .style('filter', 'drop-shadow(0px 3px 8px rgba(0,0,0,0.3))')
-      .on('mouseover', function(event, d) {
-        if (d.type === 'article') {
-          const node = d3.select(this);
-          
-          // Expand bubble animation
-          node.transition()
-            .duration(300)
-            .attr('r', Math.max(50, Math.min(120, d.title.length * 1.2)))
-            .style('filter', 'drop-shadow(0px 6px 15px rgba(0,0,0,0.4))');
-          
-          // Create expandable summary tooltip
-          const tooltip = container.append('g')
-            .attr('class', 'expanded-story-tooltip')
-            .attr('transform', `translate(${d.x + 60}, ${d.y - 60})`);
-          
-          const tooltipWidth = 450;
-          const tooltipHeight = 160;
-          
-          const rect = tooltip.append('rect')
-            .attr('width', tooltipWidth)
-            .attr('height', tooltipHeight)
-            .attr('rx', 12)
-            .style('fill', 'rgba(0,0,0,0.95)')
-            .style('stroke', d.source === 'nyt' ? '#2c3e50' : '#3498db')
-            .style('stroke-width', 3);
-          
-          // Source and topic badges
-          tooltip.append('rect')
-            .attr('x', 15)
-            .attr('y', 15)
-            .attr('width', 60)
-            .attr('height', 25)
-            .attr('rx', 12)
-            .style('fill', d.source === 'nyt' ? '#2c3e50' : '#3498db');
-          
-          tooltip.append('text')
-            .attr('x', 45)
-            .attr('y', 32)
-            .style('fill', 'white')
-            .style('font-size', '11px')
-            .style('font-weight', 'bold')
-            .style('text-anchor', 'middle')
-            .text(d.source?.toUpperCase() || 'NEWS');
-            
-          tooltip.append('rect')
-            .attr('x', 85)
-            .attr('y', 15)
-            .attr('width', Math.min(120, d.topic_cluster.length * 8))
-            .attr('height', 25)
-            .attr('rx', 12)
-            .style('fill', d.color)
-            .style('opacity', 0.8);
-          
-          tooltip.append('text')
-            .attr('x', 95)
-            .attr('y', 32)
-            .style('fill', 'white')
-            .style('font-size', '10px')
-            .style('font-weight', 'bold')
-            .text(d.topic_cluster || 'General');
-          
-          // Full headline (multi-line if needed)
-          const headline = d.title;
-          const maxLineLength = 50;
-          const lines = [];
-          
-          if (headline.length <= maxLineLength) {
-            lines.push(headline);
-          } else {
-            const words = headline.split(' ');
-            let currentLine = '';
-            
-            words.forEach(word => {
-              if ((currentLine + word).length <= maxLineLength) {
-                currentLine += (currentLine ? ' ' : '') + word;
-              } else {
-                if (currentLine) lines.push(currentLine);
-                currentLine = word;
-              }
-            });
-            if (currentLine) lines.push(currentLine);
-          }
-          
-          lines.forEach((line, index) => {
-            tooltip.append('text')
-              .attr('x', 15)
-              .attr('y', 65 + (index * 18))
-              .style('fill', '#fff')
-              .style('font-size', '13px')
-              .style('font-weight', 'bold')
-              .text(line);
-          });
-          
-          // Summary
-          const summary = d.summary || d.lede || 'Click for full analysis';
-          const truncatedSummary = summary.length > 85 ? summary.substring(0, 82) + '...' : summary;
-          
-          tooltip.append('text')
-            .attr('x', 15)
-            .attr('y', 120)
-            .style('fill', '#ccc')
-            .style('font-size', '11px')
-            .text(truncatedSummary);
-          
-          // Interactive hint
-          tooltip.append('text')
-            .attr('x', 15)
-            .attr('y', 145)
-            .style('fill', '#4CAF50')
-            .style('font-size', '10px')
-            .style('font-weight', 'bold')
-            .text('👆 Click bubble for detailed analysis & causal connections');
-        }
-      })
-      .on('mouseout', function(event, d) {
-        if (d.type === 'article') {
-          const node = d3.select(this);
-          
-          // Restore original size
-          node.transition()
-            .duration(200)
-            .attr('r', Math.max(30, Math.min(80, d.title.length * 0.8)))
-            .style('filter', 'drop-shadow(0px 3px 8px rgba(0,0,0,0.3))');
-        }
-        
-        // Remove tooltips
-        container.selectAll('.expanded-story-tooltip').remove();
-      })
-      .on('click', function(event, d) {
-        if (d.type === 'article') {
-          setSelectedNode(d);
-          trackAnalytics('view_story', { 
-            story_id: d.id, 
-            source: d.source,
-            topic_cluster: d.topic_cluster 
-          });
-        }
-      });
+      .style('stroke', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
+      .style('stroke-width', 2)
+      .style('opacity', 0.9);
 
-    // Source indicators for articles
-    nodes.filter(d => d.type === 'article' && d.source)
-      .append('circle')
-      .attr('r', 12)
-      .attr('cx', d => Math.max(30, Math.min(80, d.title.length * 0.8)) - 8)
-      .attr('cy', d => -(Math.max(30, Math.min(80, d.title.length * 0.8)) - 8))
+    // Simplified source indicators
+    articleNodes.append('circle')
+      .attr('r', 8)
+      .attr('cx', d => Math.max(25, Math.min(50, d.title.length * 0.6)) - 6)
+      .attr('cy', d => -(Math.max(25, Math.min(50, d.title.length * 0.6)) - 6))
       .style('fill', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
       .style('stroke', '#fff')
-      .style('stroke-width', 3);
+      .style('stroke-width', 2);
 
-    // Full headlines as labels (positioned outside bubbles)
-    nodes.filter(d => d.type === 'article')
-      .append('foreignObject')
-      .attr('x', d => -Math.max(60, Math.min(120, d.title.length * 0.6)))
-      .attr('y', d => Math.max(35, Math.min(85, d.title.length * 0.8)) + 10)
-      .attr('width', d => Math.max(120, Math.min(240, d.title.length * 1.2)))
-      .attr('height', 60)
-      .append('xhtml:div')
-      .style('color', '#2c3e50')
-      .style('font-size', '12px')
+    // Simplified headlines using text instead of foreignObject for better performance
+    articleNodes.append('text')
+      .text(d => {
+        // Intelligent truncation for performance
+        const title = d.title || '';
+        return title.length > 60 ? title.substring(0, 57) + '...' : title;
+      })
+      .style('font-size', '11px')
       .style('font-weight', '600')
-      .style('text-align', 'center')
-      .style('line-height', '1.3')
-      .style('background', 'rgba(255,255,255,0.9)')
-      .style('padding', '4px 8px')
-      .style('border-radius', '6px')
-      .style('box-shadow', '0 2px 4px rgba(0,0,0,0.2)')
-      .text(d => d.title); // Full headline - no truncation!
+      .style('fill', '#2c3e50')
+      .style('text-anchor', 'middle')
+      .attr('dy', d => Math.max(25, Math.min(50, d.title.length * 0.6)) + 20)
+      .style('pointer-events', 'none')
+      .call(wrap, 120); // Text wrapping function
 
-    // Topic cluster labels
+    // Topic cluster labels - simplified
     nodes.filter(d => d.type === 'topic_cluster')
       .append('text')
-      .text(d => d.title + ` (${d.story_count})`)
-      .style('font-size', '16px')
+      .text(d => `${d.title} (${d.story_count})`)
+      .style('font-size', '12px')
       .style('font-weight', 'bold')
       .style('fill', d => d.color)
       .style('text-anchor', 'middle')
-      .attr('dy', 5)
       .style('pointer-events', 'none');
 
-    // Drag behavior
+    // Optimized hover effects - only for article nodes
+    articleNodes
+      .on('mouseover', function(event, d) {
+        // Simplified hover effect
+        d3.select(this).select('circle')
+          .transition().duration(150)
+          .attr('r', d => Math.max(30, Math.min(60, d.title.length * 0.8)))
+          .style('stroke-width', 3);
+        
+        // Simple tooltip - no complex DOM manipulation
+        const tooltip = container.append('g')
+          .attr('class', 'simple-tooltip')
+          .attr('transform', `translate(${d.x + 40}, ${d.y - 30})`);
+        
+        tooltip.append('rect')
+          .attr('width', 300)
+          .attr('height', 80)
+          .attr('rx', 6)
+          .style('fill', 'rgba(0,0,0,0.9)')
+          .style('stroke', d.source === 'nyt' ? '#2c3e50' : '#3498db');
+        
+        tooltip.append('text')
+          .attr('x', 10)
+          .attr('y', 20)
+          .style('fill', '#fff')
+          .style('font-size', '12px')
+          .style('font-weight', 'bold')
+          .text(d.source?.toUpperCase() || 'NEWS');
+        
+        tooltip.append('text')
+          .attr('x', 10)
+          .attr('y', 40)
+          .style('fill', '#fff')
+          .style('font-size', '11px')
+          .text(d.title.substring(0, 35) + (d.title.length > 35 ? '...' : ''));
+        
+        tooltip.append('text')
+          .attr('x', 10)
+          .attr('y', 65)
+          .style('fill', '#4CAF50')
+          .style('font-size', '10px')
+          .text('👆 Click for details');
+      })
+      .on('mouseout', function(event, d) {
+        d3.select(this).select('circle')
+          .transition().duration(100)
+          .attr('r', d => Math.max(25, Math.min(50, d.title.length * 0.6)))
+          .style('stroke-width', 2);
+        
+        container.selectAll('.simple-tooltip').remove();
+      })
+      .on('click', function(event, d) {
+        setSelectedNode(d);
+        trackAnalytics('view_story', { 
+          story_id: d.id, 
+          source: d.source,
+          topic_cluster: d.topic_cluster 
+        });
+      });
+
+    // Simplified drag behavior
     const drag = d3.drag()
       .on('start', (event, d) => {
-        if (!event.active) simulation.alphaTarget(0.3).restart();
-        d.fx = d.x;
-        d.fy = d.y;
+        if (!event.active) simulation.alphaTarget(0.1).restart();
+        d.fx = d.x; d.fy = d.y;
       })
       .on('drag', (event, d) => {
-        d.fx = event.x;
-        d.fy = event.y;
+        d.fx = event.x; d.fy = event.y;
       })
       .on('end', (event, d) => {
         if (!event.active) simulation.alphaTarget(0);
-        d.fx = null;
-        d.fy = null;
+        d.fx = null; d.fy = null;
       });
 
-    nodes.call(drag);
+    articleNodes.call(drag);
 
-    // Update positions
+    // Optimized simulation tick
     simulation.on('tick', () => {
       links
         .attr('x1', d => d.source.x)
@@ -603,7 +427,37 @@ const App = () => {
 
       nodes.attr('transform', d => `translate(${d.x},${d.y})`);
     });
+
+    // Stop simulation early for better performance
+    simulation.tick(50); // Pre-compute 50 ticks
+    simulation.stop();
   };
+
+  // Text wrapping helper function
+  function wrap(text, width) {
+    text.each(function() {
+      const text = d3.select(this);
+      const words = text.text().split(/\s+/).reverse();
+      let word;
+      let line = [];
+      let lineNumber = 0;
+      const lineHeight = 1.1;
+      const y = text.attr("y");
+      const dy = parseFloat(text.attr("dy"));
+      let tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em");
+      
+      while (word = words.pop()) {
+        line.push(word);
+        tspan.text(line.join(" "));
+        if (tspan.node().getComputedTextLength() > width) {
+          line.pop();
+          tspan.text(line.join(" "));
+          line = [word];
+          tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", ++lineNumber * lineHeight + dy + "em").text(word);
+        }
+      }
+    });
+  }
 
   return (
     <div className="app">
