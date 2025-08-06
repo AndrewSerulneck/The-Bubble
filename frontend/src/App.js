@@ -155,7 +155,7 @@ const App = () => {
         max_articles: '15'
       });
 
-      const response = await fetch(`${backendUrl}/api/v3/news/search?${params}`);
+      const response = await fetch(`${backendUrl}/api/v4/news/search?${params}`);
       const data = await response.json();
       
       setGraphData(data);
