@@ -201,8 +201,6 @@ metadata:
 
 test_plan:
   current_focus:
-    - "NYT API Integration"
-    - "Complexity Level Controls"
   stuck_tasks:
   test_all: false
   test_priority: "high_first"
