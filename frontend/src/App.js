@@ -231,140 +231,140 @@ const App = () => {
 
     if (!data.nodes || data.nodes.length === 0) return;
 
-    const width = 1400;
-    const height = 900;
+    const width = 1600;
+    const height = 1000;
     
     svg.attr('width', width).attr('height', height);
 
-    // Enhanced force simulation with more sophisticated physics
+    // Enhanced force simulation with topic clustering
     const simulation = d3.forceSimulation(data.nodes)
       .force('link', d3.forceLink(data.edges)
         .id(d => d.id)
         .distance(d => {
-          if (d.type === 'belongs_to_section' || d.type === 'belongs_to_source') return 60;
-          return 120 + (1 - d.strength) * 150;
+          if (d.type === 'belongs_to_cluster') return 80;
+          if (d.is_causal) return 150 + (1 - d.strength) * 100;
+          return 200;
         })
         .strength(d => {
-          if (d.type === 'belongs_to_section' || d.type === 'belongs_to_source') return 0.2;
-          return d.confidence ? d.strength * d.confidence : d.strength * 0.7;
+          if (d.type === 'belongs_to_cluster') return 0.3;
+          if (d.is_causal) return d.strength * 0.8;
+          return 0.4;
         })
       )
       .force('charge', d3.forceManyBody()
-        .strength(d => d.type === 'article' ? -400 : -200)
+        .strength(d => {
+          if (d.type === 'article') return -500;
+          if (d.type === 'topic_cluster') return -800;
+          return -300;
+        })
       )
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collision', d3.forceCollide()
-        .radius(d => (d.size || 20) + 5)
+        .radius(d => (d.size || 25) + 10)
       )
-      .force('x', d3.forceX(width / 2).strength(0.1))
-      .force('y', d3.forceY(height / 2).strength(0.1));
+      // Topic clustering forces
+      .force('cluster', d3.forceX(d => {
+        if (d.type === 'article' && d.cluster_x) {
+          return d.cluster_x * width;
+        }
+        return width / 2;
+      }).strength(d => d.type === 'article' ? 0.1 : 0))
+      .force('cluster_y', d3.forceY(d => {
+        if (d.type === 'article' && d.cluster_y) {
+          return d.cluster_y * height;
+        }
+        return height / 2;
+      }).strength(d => d.type === 'article' ? 0.1 : 0));
 
     // Container with zoom
     const container = svg.append('g');
 
     // Enhanced zoom behavior
     const zoom = d3.zoom()
-      .scaleExtent([0.2, 4])
+      .scaleExtent([0.3, 5])
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
       });
     
     svg.call(zoom);
 
-    // Gradient definitions for enhanced visuals
-    const defs = svg.append('defs');
-    
-    // Gradient for confidence-based connections
-    const gradients = ['high-confidence', 'medium-confidence', 'low-confidence'];
-    gradients.forEach((grad, i) => {
-      const gradient = defs.append('linearGradient')
-        .attr('id', grad)
-        .attr('gradientUnits', 'userSpaceOnUse');
-      
-      gradient.append('stop')
-        .attr('offset', '0%')
-        .attr('stop-color', d3.schemeCategory10[i])
-        .attr('stop-opacity', 0.8);
-      
-      gradient.append('stop')
-        .attr('offset', '100%')
-        .attr('stop-color', d3.schemeCategory10[i])
-        .attr('stop-opacity', 0.3);
-    });
-
-    // Enhanced links with confidence visualization
+    // Enhanced links with causality visualization
     const links = container.selectAll('.link')
       .data(data.edges)
       .enter()
       .append('line')
       .attr('class', 'link')
       .style('stroke', d => {
-        if (d.type === 'belongs_to_section' || d.type === 'belongs_to_source') return '#ddd';
+        if (d.type === 'belongs_to_cluster') return '#e0e0e0';
         
-        const colors = {
-          'economic': '#f39c12',
-          'political': '#3498db',
-          'social': '#e74c3c',
-          'environmental': '#27ae60',
-          'causal': '#9b59b6',
-          'thematic': '#e67e22',
-          'geographic': '#1abc9c'
+        // Causal relationship colors
+        const causalColors = {
+          'causal': '#e74c3c',
+          'economic_causal': '#f39c12',
+          'political_causal': '#3498db',
+          'social_causal': '#9b59b6',
+          'environmental_causal': '#27ae60',
+          'indirect_causal': '#e67e22'
         };
-        return colors[d.type] || '#95a5a6';
+        return causalColors[d.type] || '#95a5a6';
       })
       .style('stroke-width', d => d.width || 2)
       .style('stroke-opacity', d => d.opacity || 0.6)
-      .style('stroke-dasharray', d => {
-        if (d.type === 'belongs_to_section' || d.type === 'belongs_to_source') return '5,5';
-        if (d.confidence && d.confidence < 0.5) return '10,5'; // Dashed for low confidence
-        return 'none';
-      })
+      .style('stroke-dasharray', d => d.stroke_style === 'dashed' ? '8,4' : 'none')
       .on('mouseover', function(event, d) {
-        if (d.explanation) {
-          // Show connection tooltip
+        if (d.explanation && d.is_causal) {
+          // Enhanced causality tooltip
           const tooltip = container.append('g')
-            .attr('class', 'connection-tooltip')
-            .attr('transform', `translate(${event.offsetX}, ${event.offsetY})`);
+            .attr('class', 'causality-tooltip')
+            .attr('transform', `translate(${event.offsetX || 0}, ${event.offsetY || 0})`);
           
           const rect = tooltip.append('rect')
-            .attr('width', 300)
-            .attr('height', 80)
-            .attr('rx', 8)
-            .style('fill', 'rgba(0,0,0,0.9)')
-            .style('stroke', '#fff');
+            .attr('width', 400)
+            .attr('height', 100)
+            .attr('rx', 10)
+            .style('fill', 'rgba(0,0,0,0.95)')
+            .style('stroke', d.is_causal ? '#e74c3c' : '#fff')
+            .style('stroke-width', 2);
           
           tooltip.append('text')
-            .attr('x', 10)
-            .attr('y', 20)
-            .style('fill', 'white')
-            .style('font-size', '12px')
+            .attr('x', 15)
+            .attr('y', 25)
+            .style('fill', '#fff')
+            .style('font-size', '14px')
             .style('font-weight', 'bold')
-            .text(`${d.type.toUpperCase()} Connection`);
+            .text(`🔗 ${d.causal_indicator || '→'} CAUSAL CONNECTION`);
           
           tooltip.append('text')
-            .attr('x', 10)
-            .attr('y', 40)
-            .style('fill', '#ccc')
-            .style('font-size', '10px')
-            .text(`Strength: ${d.strength?.toFixed(1) || 'N/A'} | Confidence: ${d.confidence?.toFixed(1) || 'N/A'}`);
+            .attr('x', 15)
+            .attr('y', 45)
+            .style('fill', '#f39c12')
+            .style('font-size', '11px')
+            .text(`Strength: ${(d.strength * 100).toFixed(0)}% | Confidence: ${(d.confidence * 100).toFixed(0)}%`);
           
-          const explanation = d.explanation.length > 50 
-            ? d.explanation.substring(0, 47) + '...' 
+          const explanation = d.explanation.length > 55 
+            ? d.explanation.substring(0, 52) + '...' 
             : d.explanation;
           
           tooltip.append('text')
-            .attr('x', 10)
-            .attr('y', 60)
-            .style('fill', 'white')
-            .style('font-size', '10px')
+            .attr('x', 15)
+            .attr('y', 70)
+            .style('fill', '#fff')
+            .style('font-size', '11px')
             .text(explanation);
+            
+          tooltip.append('text')
+            .attr('x', 15)
+            .attr('y', 85)
+            .style('fill', '#27ae60')
+            .style('font-size', '10px')
+            .text('Click story bubbles for detailed analysis');
         }
       })
       .on('mouseout', function() {
-        container.selectAll('.connection-tooltip').remove();
+        container.selectAll('.causality-tooltip').remove();
       });
 
-    // Enhanced nodes with source indicators
+    // Enhanced nodes with full headlines and expandable summaries
     const nodes = container.selectAll('.node')
       .data(data.nodes)
       .enter()
@@ -372,169 +372,156 @@ const App = () => {
       .attr('class', 'node')
       .style('cursor', 'pointer');
 
-    // Node circles with enhanced styling
-    nodes.append('circle')
-      .attr('r', d => d.size || 20)
+    // Topic cluster nodes (background circles)
+    nodes.filter(d => d.type === 'topic_cluster')
+      .append('circle')
+      .attr('r', d => d.size || 60)
+      .style('fill', d => d.color)
+      .style('opacity', 0.2)
+      .style('stroke', d => d.color)
+      .style('stroke-width', 2)
+      .style('stroke-dasharray', '5,5');
+
+    // Article node circles - larger to accommodate full headlines
+    nodes.filter(d => d.type === 'article')
+      .append('circle')
+      .attr('r', d => Math.max(30, Math.min(80, d.title.length * 0.8)))
       .style('fill', d => d.color || '#3498db')
       .style('stroke', d => {
         if (d.source === 'nyt') return '#2c3e50';
         if (d.source === 'guardian') return '#3498db';
         return '#fff';
       })
-      .style('stroke-width', d => d.type === 'article' ? 3 : 2)
-      .style('opacity', d => d.type === 'section' || d.type === 'source' ? 0.8 : 0.95)
-      .style('filter', 'drop-shadow(0px 2px 6px rgba(0,0,0,0.3))');
-
-    // Source indicator for articles
-    nodes.filter(d => d.type === 'article' && d.source)
-      .append('circle')
-      .attr('r', 8)
-      .attr('cx', d => (d.size || 20) - 5)
-      .attr('cy', d => -((d.size || 20) - 5))
-      .style('fill', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
-      .style('stroke', '#fff')
-      .style('stroke-width', 2);
-
-    // Enhanced labels with source information
-    nodes.filter(d => d.type === 'article')
-      .append('text')
-      .text(d => {
-        const title = d.title || '';
-        const truncated = title.length > 35 ? title.substring(0, 35) + '...' : title;
-        return truncated;
-      })
-      .style('font-size', '11px')
-      .style('fill', '#2c3e50')
-      .style('text-anchor', 'middle')
-      .attr('dy', d => (d.size || 20) + 15)
-      .style('pointer-events', 'none')
-      .style('font-weight', '600');
-
-    // Source labels for article nodes
-    nodes.filter(d => d.type === 'article' && d.source)
-      .append('text')
-      .text(d => d.source.toUpperCase())
-      .style('font-size', '8px')
-      .style('fill', '#666')
-      .style('text-anchor', 'middle')
-      .attr('dy', d => (d.size || 20) + 28)
-      .style('pointer-events', 'none')
-      .style('font-weight', 'bold');
-
-    // Section and source node labels
-    nodes.filter(d => d.type === 'section' || d.type === 'source')
-      .append('text')
-      .text(d => d.title)
-      .style('font-size', d => d.type === 'source' ? '14px' : '12px')
-      .style('font-weight', 'bold')
-      .style('fill', '#2c3e50')
-      .style('text-anchor', 'middle')
-      .attr('dy', 5)
-      .style('pointer-events', 'none');
-
-    // Enhanced hover effects
-    nodes
+      .style('stroke-width', 3)
+      .style('opacity', 0.9)
+      .style('filter', 'drop-shadow(0px 3px 8px rgba(0,0,0,0.3))')
       .on('mouseover', function(event, d) {
-        const node = d3.select(this);
-        
-        node.select('circle')
-          .transition()
-          .duration(200)
-          .attr('r', (d.size || 20) * 1.2)
-          .style('stroke-width', d.type === 'article' ? 5 : 3)
-          .style('filter', 'drop-shadow(0px 4px 12px rgba(0,0,0,0.4))');
-        
-        // Highlight connected links
-        links.style('stroke-opacity', link => 
-          link.source.id === d.id || link.target.id === d.id ? 1 : 0.1
-        );
-
-        // Enhanced tooltip for articles
         if (d.type === 'article') {
+          const node = d3.select(this);
+          
+          // Expand bubble animation
+          node.transition()
+            .duration(300)
+            .attr('r', Math.max(50, Math.min(120, d.title.length * 1.2)))
+            .style('filter', 'drop-shadow(0px 6px 15px rgba(0,0,0,0.4))');
+          
+          // Create expandable summary tooltip
           const tooltip = container.append('g')
-            .attr('class', 'article-tooltip')
-            .attr('transform', `translate(${d.x + 40}, ${d.y - 40})`);
+            .attr('class', 'expanded-story-tooltip')
+            .attr('transform', `translate(${d.x + 60}, ${d.y - 60})`);
+          
+          const tooltipWidth = 450;
+          const tooltipHeight = 160;
           
           const rect = tooltip.append('rect')
-            .attr('width', 350)
-            .attr('height', 120)
-            .attr('rx', 10)
+            .attr('width', tooltipWidth)
+            .attr('height', tooltipHeight)
+            .attr('rx', 12)
             .style('fill', 'rgba(0,0,0,0.95)')
             .style('stroke', d.source === 'nyt' ? '#2c3e50' : '#3498db')
-            .style('stroke-width', 2);
+            .style('stroke-width', 3);
           
-          // Source badge
+          // Source and topic badges
           tooltip.append('rect')
-            .attr('x', 10)
-            .attr('y', 10)
-            .attr('width', 50)
-            .attr('height', 20)
-            .attr('rx', 10)
+            .attr('x', 15)
+            .attr('y', 15)
+            .attr('width', 60)
+            .attr('height', 25)
+            .attr('rx', 12)
             .style('fill', d.source === 'nyt' ? '#2c3e50' : '#3498db');
           
           tooltip.append('text')
-            .attr('x', 35)
-            .attr('y', 23)
+            .attr('x', 45)
+            .attr('y', 32)
             .style('fill', 'white')
-            .style('font-size', '10px')
+            .style('font-size', '11px')
             .style('font-weight', 'bold')
             .style('text-anchor', 'middle')
             .text(d.source?.toUpperCase() || 'NEWS');
+            
+          tooltip.append('rect')
+            .attr('x', 85)
+            .attr('y', 15)
+            .attr('width', Math.min(120, d.topic_cluster.length * 8))
+            .attr('height', 25)
+            .attr('rx', 12)
+            .style('fill', d.color)
+            .style('opacity', 0.8);
           
-          // Title
           tooltip.append('text')
-            .attr('x', 70)
-            .attr('y', 25)
+            .attr('x', 95)
+            .attr('y', 32)
             .style('fill', 'white')
-            .style('font-size', '12px')
-            .style('font-weight', 'bold')
-            .text(d.title.substring(0, 35) + (d.title.length > 35 ? '...' : ''));
-          
-          // Metadata
-          tooltip.append('text')
-            .attr('x', 10)
-            .attr('y', 50)
-            .style('fill', '#ccc')
             .style('font-size', '10px')
-            .text(`${d.section} • ${d.read_time_minutes || 3} min read • Complexity: ${d.complexity_level || 3}/5`);
+            .style('font-weight', 'bold')
+            .text(d.topic_cluster || 'General');
+          
+          // Full headline (multi-line if needed)
+          const headline = d.title;
+          const maxLineLength = 50;
+          const lines = [];
+          
+          if (headline.length <= maxLineLength) {
+            lines.push(headline);
+          } else {
+            const words = headline.split(' ');
+            let currentLine = '';
+            
+            words.forEach(word => {
+              if ((currentLine + word).length <= maxLineLength) {
+                currentLine += (currentLine ? ' ' : '') + word;
+              } else {
+                if (currentLine) lines.push(currentLine);
+                currentLine = word;
+              }
+            });
+            if (currentLine) lines.push(currentLine);
+          }
+          
+          lines.forEach((line, index) => {
+            tooltip.append('text')
+              .attr('x', 15)
+              .attr('y', 65 + (index * 18))
+              .style('fill', '#fff')
+              .style('font-size', '13px')
+              .style('font-weight', 'bold')
+              .text(line);
+          });
           
           // Summary
           const summary = d.summary || d.lede || 'Click for full analysis';
-          const truncatedSummary = summary.length > 70 ? summary.substring(0, 67) + '...' : summary;
+          const truncatedSummary = summary.length > 85 ? summary.substring(0, 82) + '...' : summary;
           
           tooltip.append('text')
-            .attr('x', 10)
-            .attr('y', 75)
-            .style('fill', 'white')
+            .attr('x', 15)
+            .attr('y', 120)
+            .style('fill', '#ccc')
             .style('font-size', '11px')
             .text(truncatedSummary);
           
-          // Call to action
+          // Interactive hint
           tooltip.append('text')
-            .attr('x', 10)
-            .attr('y', 100)
+            .attr('x', 15)
+            .attr('y', 145)
             .style('fill', '#4CAF50')
             .style('font-size', '10px')
             .style('font-weight', 'bold')
-            .text('👆 Click for detailed AI analysis');
+            .text('👆 Click bubble for detailed analysis & causal connections');
         }
       })
       .on('mouseout', function(event, d) {
-        const node = d3.select(this);
-        
-        node.select('circle')
-          .transition()
-          .duration(200)
-          .attr('r', d.size || 20)
-          .style('stroke-width', d.type === 'article' ? 3 : 2)
-          .style('filter', 'drop-shadow(0px 2px 6px rgba(0,0,0,0.3))');
-        
-        // Reset link opacity
-        links.style('stroke-opacity', d => d.opacity || 0.6);
+        if (d.type === 'article') {
+          const node = d3.select(this);
+          
+          // Restore original size
+          node.transition()
+            .duration(200)
+            .attr('r', Math.max(30, Math.min(80, d.title.length * 0.8)))
+            .style('filter', 'drop-shadow(0px 3px 8px rgba(0,0,0,0.3))');
+        }
         
         // Remove tooltips
-        container.selectAll('.article-tooltip').remove();
-        container.selectAll('.connection-tooltip').remove();
+        container.selectAll('.expanded-story-tooltip').remove();
       })
       .on('click', function(event, d) {
         if (d.type === 'article') {
@@ -542,10 +529,50 @@ const App = () => {
           trackAnalytics('view_story', { 
             story_id: d.id, 
             source: d.source,
-            complexity_level: d.complexity_level 
+            topic_cluster: d.topic_cluster 
           });
         }
       });
+
+    // Source indicators for articles
+    nodes.filter(d => d.type === 'article' && d.source)
+      .append('circle')
+      .attr('r', 12)
+      .attr('cx', d => Math.max(30, Math.min(80, d.title.length * 0.8)) - 8)
+      .attr('cy', d => -(Math.max(30, Math.min(80, d.title.length * 0.8)) - 8))
+      .style('fill', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
+      .style('stroke', '#fff')
+      .style('stroke-width', 3);
+
+    // Full headlines as labels (positioned outside bubbles)
+    nodes.filter(d => d.type === 'article')
+      .append('foreignObject')
+      .attr('x', d => -Math.max(60, Math.min(120, d.title.length * 0.6)))
+      .attr('y', d => Math.max(35, Math.min(85, d.title.length * 0.8)) + 10)
+      .attr('width', d => Math.max(120, Math.min(240, d.title.length * 1.2)))
+      .attr('height', 60)
+      .append('xhtml:div')
+      .style('color', '#2c3e50')
+      .style('font-size', '12px')
+      .style('font-weight', '600')
+      .style('text-align', 'center')
+      .style('line-height', '1.3')
+      .style('background', 'rgba(255,255,255,0.9)')
+      .style('padding', '4px 8px')
+      .style('border-radius', '6px')
+      .style('box-shadow', '0 2px 4px rgba(0,0,0,0.2)')
+      .text(d => d.title); // Full headline - no truncation!
+
+    // Topic cluster labels
+    nodes.filter(d => d.type === 'topic_cluster')
+      .append('text')
+      .text(d => d.title + ` (${d.story_count})`)
+      .style('font-size', '16px')
+      .style('font-weight', 'bold')
+      .style('fill', d => d.color)
+      .style('text-anchor', 'middle')
+      .attr('dy', 5)
+      .style('pointer-events', 'none');
 
     // Drag behavior
     const drag = d3.drag()
