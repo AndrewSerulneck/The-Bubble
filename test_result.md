@@ -107,11 +107,11 @@ user_problem_statement: "User requested NYT API integration and complexity level
 backend:
   - task: "NYT API Integration"
     implemented: true
-    working: false
+    working: true
     file: "server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: false
         agent: "main"
@@ -119,6 +119,9 @@ backend:
       - working: false
         agent: "main"
         comment: "ISSUE FOUND: NYT API key 'nfc8xuDu40fzC0j9' is returning 401 Unauthorized errors. Backend logs show: 'Client error 401 Unauthorized for url https://api.nytimes.com/svc/search/v2/articlesearch.json?api-key=nfc8xuDu40fzC0j9'. API key may be invalid, expired, or lack proper permissions."
+      - working: true
+        agent: "testing"
+        comment: "SUCCESS: NEW NYT API key 'JoqJGXzpg6EWfRzwGi4R9FtMie1lmQMO' is working perfectly! Backend logs show successful HTTP 200 responses from NYT API. NYT articles are being retrieved, processed, and formatted correctly. Health check confirms NYT API is detected as available. Single-source NYT requests work flawlessly with proper article structure, URLs, summaries, and metadata. Multi-source integration with Guardian+NYT also working but may timeout due to AI processing complexity. Core NYT API integration is fully functional."
 
   - task: "Complexity Level Controls"
     implemented: true
