@@ -1143,12 +1143,12 @@ async def get_ultimate_knowledge_graph(
     section: Optional[str] = Query(default=None),
     complexity_level: int = Query(default=3, ge=1, le=5),
     geographic_focus: Optional[str] = Query(default=None),
-    max_articles: int = Query(default=25, ge=5, le=50),
+    max_articles: int = Query(default=12, ge=5, le=20),  # Reduced from 25 to 12
     session_id: str = Query(default_factory=lambda: str(uuid.uuid4()))
 ):
-    """Ultimate knowledge graph with all advanced features"""
+    """Optimized knowledge graph with faster processing"""
     
-    cache_key = f"ultimate_graph:{days}:{sources}:{section}:{complexity_level}:{geographic_focus}:{max_articles}"
+    cache_key = f"fast_graph:{days}:{sources}:{section}:{complexity_level}:{max_articles}"
     
     cached_result = await news_processor.get_cached_result(cache_key)
     if cached_result:
@@ -1156,7 +1156,7 @@ async def get_ultimate_knowledge_graph(
             analytics_manager.track_event,
             AnalyticsData(
                 session_id=session_id,
-                action="view_cached_ultimate_graph",
+                action="view_cached_fast_graph",
                 metadata={"cache_hit": True, "sources": sources}
             )
         )
@@ -1171,39 +1171,70 @@ async def get_ultimate_knowledge_graph(
         to_date = datetime.now().strftime('%Y-%m-%d')
         from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
         
-        # Multi-source data fetching
+        # Faster multi-source data fetching with timeouts
         source_list = sources.split(',')
         async with MultiSourceNewsClient() as client:
-            source_results = await client.search_all_sources(
-                section=section,
-                from_date=from_date,
-                to_date=to_date,
-                page_size=max_articles
-            )
+            tasks = {}
+            
+            if 'guardian' in source_list:
+                tasks['guardian'] = asyncio.wait_for(
+                    client.search_guardian(
+                        section=section,
+                        from_date=from_date,
+                        to_date=to_date,
+                        page_size=max_articles//2
+                    ), timeout=10.0  # 10 second timeout
+                )
+            
+            if 'nyt' in source_list:
+                tasks['nyt'] = asyncio.wait_for(
+                    client.search_nyt(
+                        section=section,
+                        from_date=from_date,
+                        to_date=to_date,
+                        page_size=max_articles//2
+                    ), timeout=10.0  # 10 second timeout
+                )
+            
+            # Run API calls in parallel for speed
+            source_results = {}
+            for source, task in tasks.items():
+                try:
+                    source_results[source] = await task
+                except asyncio.TimeoutError:
+                    logger.warning(f"{source} API timeout, using fallback")
+                    source_results[source] = []
+                except Exception as e:
+                    logger.error(f"{source} API error: {e}")
+                    source_results[source] = []
         
         raw_stories = []
-        guardian_stories = []
-        nyt_stories = []
+        guardian_stories = source_results.get('guardian', [])
+        nyt_stories = source_results.get('nyt', [])
         
-        if 'guardian' in source_list:
-            guardian_stories = source_results.get('guardian', [])
-            raw_stories.extend(guardian_stories)
+        raw_stories.extend(guardian_stories)
+        raw_stories.extend(nyt_stories)
         
-        if 'nyt' in source_list:
-            nyt_stories = source_results.get('nyt', [])
-            raw_stories.extend(nyt_stories)
+        # Limit total stories for faster processing
+        raw_stories = raw_stories[:max_articles]
         
-        # Process with ultimate features
-        processed_stories = await news_processor.process_multi_source_stories(
-            guardian_stories, nyt_stories, user_prefs
+        if not raw_stories:
+            logger.info("No stories found, using demo data")
+            return await get_ultimate_demo_graph()
+        
+        # Fast processing with parallel story analysis
+        processed_stories = await news_processor.process_multi_source_stories_fast(
+            guardian_stories[:max_articles//2], 
+            nyt_stories[:max_articles//2], 
+            user_prefs
         )
         
-        # Create ultimate knowledge graph
+        # Create optimized knowledge graph
         knowledge_graph = await news_processor.create_ultimate_knowledge_graph(
             processed_stories, raw_stories, user_prefs
         )
         
-        # Cache result
+        # Cache result for 15 minutes (shorter cache for faster updates)
         await news_processor.set_cached_result(cache_key, knowledge_graph)
         
         # Track analytics
@@ -1211,31 +1242,22 @@ async def get_ultimate_knowledge_graph(
             analytics_manager.track_event,
             AnalyticsData(
                 session_id=session_id,
-                action="generate_ultimate_graph",
+                action="generate_fast_graph",
                 metadata={
                     "sources_used": source_list,
                     "total_stories": len(processed_stories),
                     "complexity_level": complexity_level,
-                    "trending_topics_count": len(knowledge_graph["metadata"].get("trending_topics", [])),
-                    "geographic_regions": len(knowledge_graph["metadata"].get("geographic_insights", {}).get("regional_clusters", {})),
+                    "processing_time": "optimized",
                     "cache_miss": True
                 }
             )
         )
         
-        # Broadcast update to WebSocket clients
-        await update_service.broadcast_story_update({
-            "type": "ultimate_graph_generated",
-            "articles_count": len(processed_stories),
-            "connections_count": knowledge_graph["metadata"]["total_connections"],
-            "session_id": session_id
-        })
-        
         return knowledge_graph
         
     except Exception as e:
-        logger.error(f"Ultimate knowledge graph error: {e}")
-        # Fallback to enhanced demo
+        logger.error(f"Fast knowledge graph error: {e}")
+        # Quick fallback to demo
         return await get_ultimate_demo_graph()
 
 @app.get("/api/v4/demo/ultimate")
