@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 import json
 import logging
 from contextlib import asynccontextmanager
-import aioredis
+# import aioredis - will be imported conditionally
 from collections import defaultdict
 import time
 
