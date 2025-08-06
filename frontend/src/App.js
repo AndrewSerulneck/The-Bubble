@@ -9,10 +9,22 @@ const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [days, setDays] = useState(3);
   const [section, setSection] = useState('');
+  const [sources, setSources] = useState('guardian,nyt');
+  const [complexityLevel, setComplexityLevel] = useState(3);
+  const [geographicFocus, setGeographicFocus] = useState('');
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [showFeedback, setShowFeedback] = useState(false);
-  const [feedbackData, setFeedbackData] = useState({ rating: 5, comments: '', email: '' });
-  const [showHelp, setShowHelp] = useState(false);
+  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
+  const [feedbackData, setFeedbackData] = useState({
+    rating: 5,
+    comments: '',
+    email: '',
+    features_used: [],
+    most_interesting_connection: '',
+    suggested_improvements: ''
+  });
+  const [sessionId] = useState(() => `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`);
+  const [analytics, setAnalytics] = useState({ stories_viewed: 0, connections_explored: 0 });
   const svgRef = useRef();
 
   const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
@@ -22,196 +34,303 @@ const App = () => {
     'culture', 'science', 'environment', 'education', 'society'
   ];
 
+  const sourceOptions = [
+    { value: 'guardian,nyt', label: '📰 Both Sources (Recommended)' },
+    { value: 'guardian', label: '🇬🇧 The Guardian Only' },
+    { value: 'nyt', label: '🇺🇸 New York Times Only' }
+  ];
+
+  const complexityOptions = [
+    { value: 1, label: '📱 Simple - Headlines & Key Facts', description: 'Perfect for quick updates' },
+    { value: 2, label: '📝 Basic - Context & Background', description: 'Essential information with context' },
+    { value: 3, label: '📊 Moderate - Analysis & Connections', description: 'Balanced depth and accessibility' },
+    { value: 4, label: '🔍 Detailed - In-depth Analysis', description: 'Comprehensive coverage with expert insights' },
+    { value: 5, label: '🎓 Expert - Theories & Implications', description: 'Academic-level analysis and implications' }
+  ];
+
+  const geographicOptions = [
+    { value: '', label: '🌍 Global Perspective' },
+    { value: 'US', label: '🇺🇸 United States Focus' },
+    { value: 'Europe', label: '🇪🇺 European Focus' },
+    { value: 'Asia', label: '🌏 Asian Focus' },
+    { value: 'Americas', label: '🌎 Americas Focus' }
+  ];
+
   useEffect(() => {
-    // Auto-load demo data on first visit
-    loadKnowledgeGraph();
+    loadAdvancedKnowledgeGraph();
   }, []);
 
-  const loadKnowledgeGraph = async () => {
+  const trackAnalytics = async (action, metadata = {}) => {
+    try {
+      const analyticsData = {
+        session_id: sessionId,
+        action: action,
+        story_id: metadata.story_id || null,
+        connection_id: metadata.connection_id || null,
+        timestamp: new Date().toISOString(),
+        metadata: metadata
+      };
+      
+      // Update local analytics
+      if (action === 'view_story') {
+        setAnalytics(prev => ({ ...prev, stories_viewed: prev.stories_viewed + 1 }));
+      } else if (action === 'explore_connection') {
+        setAnalytics(prev => ({ ...prev, connections_explored: prev.connections_explored + 1 }));
+      }
+      
+      // Send to backend (optional, will fail gracefully in demo)
+      fetch(`${backendUrl}/api/v3/analytics/track`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(analyticsData)
+      }).catch(() => {}); // Silent fail for demo
+    } catch (error) {
+      console.log('Analytics tracking (demo mode):', action);
+    }
+  };
+
+  const loadAdvancedKnowledgeGraph = async () => {
     setLoading(true);
     try {
-      // Use demo endpoint for reliable user testing
-      const response = await fetch(`${backendUrl}/api/demo-graph`);
-      const data = await response.json();
+      const params = new URLSearchParams({
+        days: days,
+        sources: sources,
+        complexity_level: complexityLevel,
+        session_id: sessionId,
+        max_articles: '20'
+      });
       
+      if (section) params.append('section', section);
+      if (geographicFocus) params.append('geographic_focus', geographicFocus);
+
+      const response = await fetch(`${backendUrl}/api/v3/knowledge-graph/advanced?${params}`);
+      
+      if (!response.ok) {
+        throw new Error('API error, loading demo data');
+      }
+      
+      const data = await response.json();
       setGraphData(data);
-      renderGraph(data);
+      renderAdvancedGraph(data);
+      
+      trackAnalytics('load_advanced_graph', {
+        sources: sources,
+        complexity_level: complexityLevel,
+        total_articles: data.metadata?.total_articles || 0
+      });
+      
     } catch (error) {
-      console.error('Error loading knowledge graph:', error);
+      console.error('Error loading advanced graph:', error);
+      // Fallback to production demo
+      loadProductionDemo();
     } finally {
       setLoading(false);
     }
   };
 
-  const searchNews = async () => {
+  const loadProductionDemo = async () => {
+    try {
+      const response = await fetch(`${backendUrl}/api/v3/demo/production`);
+      const data = await response.json();
+      setGraphData(data);
+      renderAdvancedGraph(data);
+      
+      trackAnalytics('load_demo', { demo_type: 'production' });
+    } catch (error) {
+      console.error('Error loading demo:', error);
+    }
+  };
+
+  const searchAdvancedNews = async () => {
     if (!searchQuery.trim()) return;
     
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      params.append('query', searchQuery);
-      params.append('days', days);
-      params.append('max_articles', '15');
+      const params = new URLSearchParams({
+        query: searchQuery,
+        days: days,
+        sources: sources,
+        complexity_level: complexityLevel,
+        session_id: sessionId,
+        max_articles: '15'
+      });
 
-      const response = await fetch(`${backendUrl}/api/search?${params}`);
+      const response = await fetch(`${backendUrl}/api/v3/news/search?${params}`);
       const data = await response.json();
       
       setGraphData(data);
-      renderGraph(data);
+      renderAdvancedGraph(data);
+      
+      trackAnalytics('advanced_search', {
+        query: searchQuery,
+        sources: sources,
+        results_count: data.metadata?.total_articles || 0
+      });
+      
     } catch (error) {
-      console.error('Error searching news:', error);
-      // Fallback to demo data if search fails
-      loadKnowledgeGraph();
+      console.error('Error searching:', error);
+      loadProductionDemo();
     } finally {
       setLoading(false);
     }
   };
 
-  const submitFeedback = async () => {
+  const submitEnhancedFeedback = async () => {
     try {
-      const response = await fetch(`${backendUrl}/api/feedback`, {
+      const enhancedFeedback = {
+        ...feedbackData,
+        session_id: sessionId,
+        features_used: [
+          'multi_source_integration',
+          'complexity_adaptation',
+          'advanced_visualization',
+          'ai_analysis'
+        ].filter(feature => {
+          // Basic feature usage detection
+          if (feature === 'multi_source_integration' && sources.includes(',')) return true;
+          if (feature === 'complexity_adaptation' && complexityLevel !== 3) return true;
+          if (feature === 'advanced_visualization') return analytics.stories_viewed > 0;
+          if (feature === 'ai_analysis') return analytics.connections_explored > 0;
+          return false;
+        })
+      };
+      
+      const response = await fetch(`${backendUrl}/api/v3/feedback/enhanced`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(feedbackData)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(enhancedFeedback)
       });
       
       if (response.ok) {
-        alert('Thank you for your feedback! 🙏');
-        setShowFeedback(false);
-        setFeedbackData({ rating: 5, comments: '', email: '' });
+        alert('🙏 Thank you for your detailed feedback! Your insights help us improve the platform.');
+      } else {
+        alert('Thank you for your feedback! (Demo mode - feedback noted locally)');
       }
+      
+      setShowFeedback(false);
+      setFeedbackData({
+        rating: 5,
+        comments: '',
+        email: '',
+        features_used: [],
+        most_interesting_connection: '',
+        suggested_improvements: ''
+      });
+      
+      trackAnalytics('submit_enhanced_feedback', { rating: feedbackData.rating });
+      
     } catch (error) {
-      alert('Thanks for your feedback! (Note: This is a demo, so feedback is noted locally)');
+      alert('Thanks for your feedback! (Demo mode)');
       setShowFeedback(false);
     }
   };
 
-  const renderGraph = (data) => {
+  const renderAdvancedGraph = (data) => {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
     if (!data.nodes || data.nodes.length === 0) return;
 
-    const width = 1200;
-    const height = 800;
+    const width = 1400;
+    const height = 900;
     
     svg.attr('width', width).attr('height', height);
 
-    // Create force simulation
+    // Enhanced force simulation with more sophisticated physics
     const simulation = d3.forceSimulation(data.nodes)
       .force('link', d3.forceLink(data.edges)
         .id(d => d.id)
-        .distance(d => d.type === 'belongs_to' ? 50 : 100 + (1 - d.strength) * 100)
-        .strength(d => d.type === 'belongs_to' ? 0.3 : d.strength * 0.8)
+        .distance(d => {
+          if (d.type === 'belongs_to_section' || d.type === 'belongs_to_source') return 60;
+          return 120 + (1 - d.strength) * 150;
+        })
+        .strength(d => {
+          if (d.type === 'belongs_to_section' || d.type === 'belongs_to_source') return 0.2;
+          return d.confidence ? d.strength * d.confidence : d.strength * 0.7;
+        })
       )
-      .force('charge', d3.forceManyBody().strength(-300))
+      .force('charge', d3.forceManyBody()
+        .strength(d => d.type === 'article' ? -400 : -200)
+      )
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(d => d.size || 20));
+      .force('collision', d3.forceCollide()
+        .radius(d => (d.size || 20) + 5)
+      )
+      .force('x', d3.forceX(width / 2).strength(0.1))
+      .force('y', d3.forceY(height / 2).strength(0.1));
 
-    // Create container for zoom
+    // Container with zoom
     const container = svg.append('g');
 
-    // Add zoom behavior
+    // Enhanced zoom behavior
     const zoom = d3.zoom()
-      .scaleExtent([0.3, 3])
+      .scaleExtent([0.2, 4])
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
       });
     
     svg.call(zoom);
 
-    // Create links with enhanced styling
+    // Gradient definitions for enhanced visuals
+    const defs = svg.append('defs');
+    
+    // Gradient for confidence-based connections
+    const gradients = ['high-confidence', 'medium-confidence', 'low-confidence'];
+    gradients.forEach((grad, i) => {
+      const gradient = defs.append('linearGradient')
+        .attr('id', grad)
+        .attr('gradientUnits', 'userSpaceOnUse');
+      
+      gradient.append('stop')
+        .attr('offset', '0%')
+        .attr('stop-color', d3.schemeCategory10[i])
+        .attr('stop-opacity', 0.8);
+      
+      gradient.append('stop')
+        .attr('offset', '100%')
+        .attr('stop-color', d3.schemeCategory10[i])
+        .attr('stop-opacity', 0.3);
+    });
+
+    // Enhanced links with confidence visualization
     const links = container.selectAll('.link')
       .data(data.edges)
       .enter()
       .append('line')
       .attr('class', 'link')
       .style('stroke', d => {
-        if (d.type === 'belongs_to') return '#ddd';
+        if (d.type === 'belongs_to_section' || d.type === 'belongs_to_source') return '#ddd';
+        
         const colors = {
           'economic': '#f39c12',
           'political': '#3498db',
           'social': '#e74c3c',
           'environmental': '#27ae60',
           'causal': '#9b59b6',
-          'thematic': '#e67e22'
+          'thematic': '#e67e22',
+          'geographic': '#1abc9c'
         };
         return colors[d.type] || '#95a5a6';
       })
       .style('stroke-width', d => d.width || 2)
       .style('stroke-opacity', d => d.opacity || 0.6)
-      .style('stroke-dasharray', d => d.type === 'belongs_to' ? '5,5' : 'none');
-
-    // Create nodes
-    const nodes = container.selectAll('.node')
-      .data(data.nodes)
-      .enter()
-      .append('g')
-      .attr('class', 'node')
-      .style('cursor', 'pointer');
-
-    // Add circles for nodes with enhanced styling
-    nodes.append('circle')
-      .attr('r', d => d.size || 20)
-      .style('fill', d => d.color || '#3498db')
-      .style('stroke', '#fff')
-      .style('stroke-width', 2)
-      .style('opacity', d => d.type === 'section' ? 0.7 : 0.9)
-      .style('filter', 'drop-shadow(0px 2px 4px rgba(0,0,0,0.2))');
-
-    // Add labels for articles
-    nodes.filter(d => d.type === 'article')
-      .append('text')
-      .text(d => {
-        const title = d.title || '';
-        return title.length > 30 ? title.substring(0, 30) + '...' : title;
+      .style('stroke-dasharray', d => {
+        if (d.type === 'belongs_to_section' || d.type === 'belongs_to_source') return '5,5';
+        if (d.confidence && d.confidence < 0.5) return '10,5'; // Dashed for low confidence
+        return 'none';
       })
-      .style('font-size', '10px')
-      .style('fill', '#2c3e50')
-      .style('text-anchor', 'middle')
-      .attr('dy', 35)
-      .style('pointer-events', 'none')
-      .style('font-weight', '600');
-
-    // Add labels for sections
-    nodes.filter(d => d.type === 'section')
-      .append('text')
-      .text(d => d.title)
-      .style('font-size', '12px')
-      .style('font-weight', 'bold')
-      .style('fill', '#2c3e50')
-      .style('text-anchor', 'middle')
-      .attr('dy', 4)
-      .style('pointer-events', 'none');
-
-    // Add enhanced hover effects
-    nodes
       .on('mouseover', function(event, d) {
-        d3.select(this).select('circle')
-          .transition()
-          .duration(200)
-          .attr('r', (d.size || 20) * 1.3)
-          .style('stroke-width', 4)
-          .style('filter', 'drop-shadow(0px 4px 8px rgba(0,0,0,0.3))');
-        
-        // Highlight connected links
-        links.style('stroke-opacity', link => 
-          link.source.id === d.id || link.target.id === d.id ? 1 : 0.1
-        );
-
-        // Show connection info tooltip
-        if (d.type === 'article') {
+        if (d.explanation) {
+          // Show connection tooltip
           const tooltip = container.append('g')
-            .attr('class', 'tooltip')
-            .attr('transform', `translate(${d.x + 30}, ${d.y - 30})`);
+            .attr('class', 'connection-tooltip')
+            .attr('transform', `translate(${event.offsetX}, ${event.offsetY})`);
           
           const rect = tooltip.append('rect')
-            .attr('width', 200)
-            .attr('height', 60)
-            .attr('rx', 5)
-            .style('fill', 'rgba(0,0,0,0.8)')
+            .attr('width', 300)
+            .attr('height', 80)
+            .attr('rx', 8)
+            .style('fill', 'rgba(0,0,0,0.9)')
             .style('stroke', '#fff');
           
           tooltip.append('text')
@@ -220,37 +339,215 @@ const App = () => {
             .style('fill', 'white')
             .style('font-size', '12px')
             .style('font-weight', 'bold')
-            .text(d.title.substring(0, 25) + '...');
+            .text(`${d.type.toUpperCase()} Connection`);
           
           tooltip.append('text')
             .attr('x', 10)
             .attr('y', 40)
             .style('fill', '#ccc')
             .style('font-size', '10px')
-            .text(`${d.section} • Click for details`);
+            .text(`Strength: ${d.strength?.toFixed(1) || 'N/A'} | Confidence: ${d.confidence?.toFixed(1) || 'N/A'}`);
+          
+          const explanation = d.explanation.length > 50 
+            ? d.explanation.substring(0, 47) + '...' 
+            : d.explanation;
+          
+          tooltip.append('text')
+            .attr('x', 10)
+            .attr('y', 60)
+            .style('fill', 'white')
+            .style('font-size', '10px')
+            .text(explanation);
+        }
+      })
+      .on('mouseout', function() {
+        container.selectAll('.connection-tooltip').remove();
+      });
+
+    // Enhanced nodes with source indicators
+    const nodes = container.selectAll('.node')
+      .data(data.nodes)
+      .enter()
+      .append('g')
+      .attr('class', 'node')
+      .style('cursor', 'pointer');
+
+    // Node circles with enhanced styling
+    nodes.append('circle')
+      .attr('r', d => d.size || 20)
+      .style('fill', d => d.color || '#3498db')
+      .style('stroke', d => {
+        if (d.source === 'nyt') return '#2c3e50';
+        if (d.source === 'guardian') return '#3498db';
+        return '#fff';
+      })
+      .style('stroke-width', d => d.type === 'article' ? 3 : 2)
+      .style('opacity', d => d.type === 'section' || d.type === 'source' ? 0.8 : 0.95)
+      .style('filter', 'drop-shadow(0px 2px 6px rgba(0,0,0,0.3))');
+
+    // Source indicator for articles
+    nodes.filter(d => d.type === 'article' && d.source)
+      .append('circle')
+      .attr('r', 8)
+      .attr('cx', d => (d.size || 20) - 5)
+      .attr('cy', d => -((d.size || 20) - 5))
+      .style('fill', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
+      .style('stroke', '#fff')
+      .style('stroke-width', 2);
+
+    // Enhanced labels with source information
+    nodes.filter(d => d.type === 'article')
+      .append('text')
+      .text(d => {
+        const title = d.title || '';
+        const truncated = title.length > 35 ? title.substring(0, 35) + '...' : title;
+        return truncated;
+      })
+      .style('font-size', '11px')
+      .style('fill', '#2c3e50')
+      .style('text-anchor', 'middle')
+      .attr('dy', d => (d.size || 20) + 15)
+      .style('pointer-events', 'none')
+      .style('font-weight', '600');
+
+    // Source labels for article nodes
+    nodes.filter(d => d.type === 'article' && d.source)
+      .append('text')
+      .text(d => d.source.toUpperCase())
+      .style('font-size', '8px')
+      .style('fill', '#666')
+      .style('text-anchor', 'middle')
+      .attr('dy', d => (d.size || 20) + 28)
+      .style('pointer-events', 'none')
+      .style('font-weight', 'bold');
+
+    // Section and source node labels
+    nodes.filter(d => d.type === 'section' || d.type === 'source')
+      .append('text')
+      .text(d => d.title)
+      .style('font-size', d => d.type === 'source' ? '14px' : '12px')
+      .style('font-weight', 'bold')
+      .style('fill', '#2c3e50')
+      .style('text-anchor', 'middle')
+      .attr('dy', 5)
+      .style('pointer-events', 'none');
+
+    // Enhanced hover effects
+    nodes
+      .on('mouseover', function(event, d) {
+        const node = d3.select(this);
+        
+        node.select('circle')
+          .transition()
+          .duration(200)
+          .attr('r', (d.size || 20) * 1.2)
+          .style('stroke-width', d.type === 'article' ? 5 : 3)
+          .style('filter', 'drop-shadow(0px 4px 12px rgba(0,0,0,0.4))');
+        
+        // Highlight connected links
+        links.style('stroke-opacity', link => 
+          link.source.id === d.id || link.target.id === d.id ? 1 : 0.1
+        );
+
+        // Enhanced tooltip for articles
+        if (d.type === 'article') {
+          const tooltip = container.append('g')
+            .attr('class', 'article-tooltip')
+            .attr('transform', `translate(${d.x + 40}, ${d.y - 40})`);
+          
+          const rect = tooltip.append('rect')
+            .attr('width', 350)
+            .attr('height', 120)
+            .attr('rx', 10)
+            .style('fill', 'rgba(0,0,0,0.95)')
+            .style('stroke', d.source === 'nyt' ? '#2c3e50' : '#3498db')
+            .style('stroke-width', 2);
+          
+          // Source badge
+          tooltip.append('rect')
+            .attr('x', 10)
+            .attr('y', 10)
+            .attr('width', 50)
+            .attr('height', 20)
+            .attr('rx', 10)
+            .style('fill', d.source === 'nyt' ? '#2c3e50' : '#3498db');
+          
+          tooltip.append('text')
+            .attr('x', 35)
+            .attr('y', 23)
+            .style('fill', 'white')
+            .style('font-size', '10px')
+            .style('font-weight', 'bold')
+            .style('text-anchor', 'middle')
+            .text(d.source?.toUpperCase() || 'NEWS');
+          
+          // Title
+          tooltip.append('text')
+            .attr('x', 70)
+            .attr('y', 25)
+            .style('fill', 'white')
+            .style('font-size', '12px')
+            .style('font-weight', 'bold')
+            .text(d.title.substring(0, 35) + (d.title.length > 35 ? '...' : ''));
+          
+          // Metadata
+          tooltip.append('text')
+            .attr('x', 10)
+            .attr('y', 50)
+            .style('fill', '#ccc')
+            .style('font-size', '10px')
+            .text(`${d.section} • ${d.read_time_minutes || 3} min read • Complexity: ${d.complexity_level || 3}/5`);
+          
+          // Summary
+          const summary = d.summary || d.lede || 'Click for full analysis';
+          const truncatedSummary = summary.length > 70 ? summary.substring(0, 67) + '...' : summary;
+          
+          tooltip.append('text')
+            .attr('x', 10)
+            .attr('y', 75)
+            .style('fill', 'white')
+            .style('font-size', '11px')
+            .text(truncatedSummary);
+          
+          // Call to action
+          tooltip.append('text')
+            .attr('x', 10)
+            .attr('y', 100)
+            .style('fill', '#4CAF50')
+            .style('font-size', '10px')
+            .style('font-weight', 'bold')
+            .text('👆 Click for detailed AI analysis');
         }
       })
       .on('mouseout', function(event, d) {
-        d3.select(this).select('circle')
+        const node = d3.select(this);
+        
+        node.select('circle')
           .transition()
           .duration(200)
           .attr('r', d.size || 20)
-          .style('stroke-width', 2)
-          .style('filter', 'drop-shadow(0px 2px 4px rgba(0,0,0,0.2))');
+          .style('stroke-width', d.type === 'article' ? 3 : 2)
+          .style('filter', 'drop-shadow(0px 2px 6px rgba(0,0,0,0.3))');
         
         // Reset link opacity
         links.style('stroke-opacity', d => d.opacity || 0.6);
         
-        // Remove tooltip
-        container.selectAll('.tooltip').remove();
+        // Remove tooltips
+        container.selectAll('.article-tooltip').remove();
+        container.selectAll('.connection-tooltip').remove();
       })
       .on('click', function(event, d) {
         if (d.type === 'article') {
           setSelectedNode(d);
+          trackAnalytics('view_story', { 
+            story_id: d.id, 
+            source: d.source,
+            complexity_level: d.complexity_level 
+          });
         }
       });
 
-    // Add drag behavior
+    // Drag behavior
     const drag = d3.drag()
       .on('start', (event, d) => {
         if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -269,7 +566,7 @@ const App = () => {
 
     nodes.call(drag);
 
-    // Update positions on tick
+    // Update positions
     simulation.on('tick', () => {
       links
         .attr('x1', d => d.source.x)
@@ -283,127 +580,70 @@ const App = () => {
 
   return (
     <div className="app">
-      {/* Onboarding Modal */}
+      {/* Enhanced Onboarding Modal */}
       {showOnboarding && (
         <div className="modal-overlay">
-          <div className="onboarding-modal">
+          <div className="onboarding-modal advanced">
             <div className="modal-header">
-              <h2>🎯 Welcome to News Knowledge Graph</h2>
-              <p>Discover how AI reveals hidden connections between world events</p>
+              <h2>🚀 Welcome to Advanced News Intelligence</h2>
+              <p>Multi-source AI analysis with unprecedented depth and customization</p>
             </div>
             
-            <div className="onboarding-steps">
-              <div className="step">
-                <span className="step-number">1</span>
-                <div className="step-content">
-                  <h3>🔗 See Story Connections</h3>
-                  <p>AI analyzes news stories and shows how they're related - from obvious economic links to surprising global connections.</p>
+            <div className="onboarding-features">
+              <div className="feature-highlight">
+                <span className="feature-icon">🌐</span>
+                <div className="feature-content">
+                  <h3>Multi-Source Integration</h3>
+                  <p>Combine The Guardian and New York Times for comprehensive coverage</p>
                 </div>
               </div>
               
-              <div className="step">
-                <span className="step-number">2</span>
-                <div className="step-content">
-                  <h3>💫 Interactive Exploration</h3>
-                  <p>Hover over stories to see connections light up. Click circles for detailed analysis. Drag nodes to explore.</p>
+              <div className="feature-highlight">
+                <span className="feature-icon">🧠</span>
+                <div className="feature-content">
+                  <h3>Advanced AI Analysis</h3>
+                  <p>Confidence scoring, evidence assessment, and sophisticated relationship detection</p>
                 </div>
               </div>
               
-              <div className="step">
-                <span className="step-number">3</span>
-                <div className="step-content">
-                  <h3>📊 Connection Strength</h3>
-                  <p>Line thickness shows connection strength: thick lines = strong relationships, thin lines = subtle connections.</p>
+              <div className="feature-highlight">
+                <span className="feature-icon">⚙️</span>
+                <div className="feature-content">
+                  <h3>Complexity Adaptation</h3>
+                  <p>Content adapts from simple headlines to expert-level analysis based on your preference</p>
                 </div>
               </div>
             </div>
             
             <div className="onboarding-actions">
               <button 
-                className="demo-button"
+                className="demo-button advanced"
                 onClick={() => {
                   setShowOnboarding(false);
-                  loadKnowledgeGraph();
+                  loadAdvancedKnowledgeGraph();
+                  trackAnalytics('complete_onboarding', { version: 'advanced' });
                 }}
               >
-                🚀 Explore Demo Stories
-              </button>
-              <button 
-                className="skip-button"
-                onClick={() => setShowOnboarding(false)}
-              >
-                Skip Tour
+                🎯 Explore Advanced Features
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Help Modal */}
-      {showHelp && (
-        <div className="modal-overlay">
-          <div className="help-modal">
-            <div className="modal-header">
-              <h2>❓ How to Use the Knowledge Graph</h2>
-              <button 
-                className="close-button"
-                onClick={() => setShowHelp(false)}
-              >
-                ×
-              </button>
-            </div>
-            
-            <div className="help-content">
-              <div className="help-section">
-                <h3>🎯 What You're Seeing</h3>
-                <ul>
-                  <li><strong>Circles</strong> = News stories (articles) and topic categories (sections)</li>
-                  <li><strong>Lines</strong> = AI-discovered relationships between stories</li>
-                  <li><strong>Colors</strong> = Different types of connections (political, economic, etc.)</li>
-                </ul>
-              </div>
-              
-              <div className="help-section">
-                <h3>🖱️ How to Interact</h3>
-                <ul>
-                  <li><strong>Hover</strong> over circles to highlight connections</li>
-                  <li><strong>Click</strong> article circles to read detailed analysis</li>
-                  <li><strong>Drag</strong> circles to reposition them</li>
-                  <li><strong>Scroll</strong> to zoom in/out of the graph</li>
-                </ul>
-              </div>
-              
-              <div className="help-section">
-                <h3>🔍 Example Connections</h3>
-                <ul>
-                  <li><strong>Political</strong>: Trump's institutional attacks are related</li>
-                  <li><strong>Economic</strong>: Fed policies affect market confidence</li>
-                  <li><strong>Thematic</strong>: International diplomatic coordination</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Feedback Modal */}
+      {/* Enhanced Feedback Modal */}
       {showFeedback && (
         <div className="modal-overlay">
-          <div className="feedback-modal">
+          <div className="feedback-modal enhanced">
             <div className="modal-header">
-              <h2>💭 Your Feedback Matters!</h2>
-              <p>Help us improve the news knowledge graph experience</p>
-              <button 
-                className="close-button"
-                onClick={() => setShowFeedback(false)}
-              >
-                ×
-              </button>
+              <h2>🎯 Advanced Feedback</h2>
+              <p>Help us refine the future of news intelligence</p>
+              <button className="close-button" onClick={() => setShowFeedback(false)}>×</button>
             </div>
             
-            <div className="feedback-content">
+            <div className="feedback-content enhanced">
               <div className="feedback-section">
-                <label>How intuitive was the interface? (1-10)</label>
+                <label>Overall Experience (1-10)</label>
                 <input
                   type="range"
                   min="1"
@@ -416,17 +656,38 @@ const App = () => {
               </div>
               
               <div className="feedback-section">
-                <label>What did you find most interesting?</label>
+                <label>Most Interesting Connection</label>
+                <input
+                  type="text"
+                  value={feedbackData.most_interesting_connection}
+                  onChange={(e) => setFeedbackData({...feedbackData, most_interesting_connection: e.target.value})}
+                  placeholder="e.g., 'EU climate policy affecting US interest rates'"
+                  className="feedback-input"
+                />
+              </div>
+              
+              <div className="feedback-section">
+                <label>What worked best for you?</label>
                 <textarea
                   value={feedbackData.comments}
                   onChange={(e) => setFeedbackData({...feedbackData, comments: e.target.value})}
-                  placeholder="E.g., 'The connection between political stories and economic impacts was surprising...'"
+                  placeholder="Multi-source integration, complexity levels, AI explanations, etc."
                   className="feedback-textarea"
                 />
               </div>
               
               <div className="feedback-section">
-                <label>Email (optional, for follow-up)</label>
+                <label>Suggestions for Improvement</label>
+                <textarea
+                  value={feedbackData.suggested_improvements}
+                  onChange={(e) => setFeedbackData({...feedbackData, suggested_improvements: e.target.value})}
+                  placeholder="New features, better visualizations, additional data sources..."
+                  className="feedback-textarea"
+                />
+              </div>
+              
+              <div className="feedback-section">
+                <label>Email (optional, for feature updates)</label>
                 <input
                   type="email"
                   value={feedbackData.email}
@@ -436,8 +697,8 @@ const App = () => {
                 />
               </div>
               
-              <button className="submit-feedback-button" onClick={submitFeedback}>
-                📤 Submit Feedback
+              <button className="submit-feedback-button enhanced" onClick={submitEnhancedFeedback}>
+                🚀 Submit Advanced Feedback
               </button>
             </div>
           </div>
@@ -445,135 +706,203 @@ const App = () => {
       )}
 
       {/* Header */}
-      <header className="header">
+      <header className="header advanced">
         <div className="header-content">
-          <h1 className="title">News Knowledge Graph</h1>
-          <p className="subtitle">AI-Powered Story Relationship Visualization</p>
-          <div className="header-actions">
+          <div className="header-left">
+            <h1 className="title">News Intelligence Platform</h1>
+            <p className="subtitle">Multi-Source AI Analysis • Advanced Visualization • Adaptive Complexity</p>
+          </div>
+          <div className="header-right">
+            <div className="analytics-display">
+              <div className="analytics-item">
+                <span className="analytics-number">{analytics.stories_viewed}</span>
+                <span className="analytics-label">Stories Viewed</span>
+              </div>
+              <div className="analytics-item">
+                <span className="analytics-number">{analytics.connections_explored}</span>
+                <span className="analytics-label">Connections Explored</span>
+              </div>
+            </div>
             <button 
-              className="help-trigger"
-              onClick={() => setShowHelp(true)}
-            >
-              ❓ How it Works
-            </button>
-            <button 
-              className="feedback-trigger"
+              className="feedback-trigger advanced"
               onClick={() => setShowFeedback(true)}
             >
-              💭 Give Feedback
+              💡 Share Insights
             </button>
           </div>
         </div>
       </header>
 
-      {/* Controls */}
-      <div className="controls">
+      {/* Advanced Controls */}
+      <div className="controls advanced">
         <div className="search-section">
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && searchNews()}
-            placeholder="Try searching: 'Trump', 'climate', 'economy'..."
-            className="search-input"
+            onKeyPress={(e) => e.key === 'Enter' && searchAdvancedNews()}
+            placeholder="Advanced search across multiple sources..."
+            className="search-input advanced"
           />
-          <button onClick={searchNews} className="search-button">
-            🔍 Search & Analyze
+          <button onClick={searchAdvancedNews} className="search-button advanced">
+            🔍 AI-Powered Search
           </button>
         </div>
 
-        <div className="filters">
-          <div className="filter-group">
-            <label>📅 Time Range:</label>
-            <select value={days} onChange={(e) => setDays(parseInt(e.target.value))}>
-              <option value={1}>Last 24 hours</option>
-              <option value={3}>Last 3 days</option>
-              <option value={7}>Last week</option>
-              <option value={14}>Last 2 weeks</option>
-            </select>
+        <div className="filters advanced">
+          <div className="filter-row primary">
+            <div className="filter-group">
+              <label>🗞️ News Sources:</label>
+              <select value={sources} onChange={(e) => setSources(e.target.value)}>
+                {sourceOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>📅 Time Range:</label>
+              <select value={days} onChange={(e) => setDays(parseInt(e.target.value))}>
+                <option value={1}>Last 24 hours</option>
+                <option value={3}>Last 3 days</option>
+                <option value={7}>Last week</option>
+                <option value={14}>Last 2 weeks</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label>📰 Section:</label>
+              <select value={section} onChange={(e) => setSection(e.target.value)}>
+                <option value="">All sections</option>
+                {sections.slice(1).map(sec => (
+                  <option key={sec} value={sec}>
+                    {sec.charAt(0).toUpperCase() + sec.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="filter-group">
-            <label>📰 Section:</label>
-            <select value={section} onChange={(e) => setSection(e.target.value)}>
-              <option value="">All sections</option>
-              {sections.slice(1).map(sec => (
-                <option key={sec} value={sec}>
-                  {sec.charAt(0).toUpperCase() + sec.slice(1)}
-                </option>
-              ))}
-            </select>
+          <div className="filter-row secondary">
+            <div className="filter-group complexity">
+              <label>🎓 Complexity Level:</label>
+              <select 
+                value={complexityLevel} 
+                onChange={(e) => setComplexityLevel(parseInt(e.target.value))}
+                className="complexity-select"
+              >
+                {complexityOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span className="complexity-description">
+                {complexityOptions.find(opt => opt.value === complexityLevel)?.description}
+              </span>
+            </div>
+
+            <div className="filter-group">
+              <label>🌍 Geographic Focus:</label>
+              <select value={geographicFocus} onChange={(e) => setGeographicFocus(e.target.value)}>
+                {geographicOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <button onClick={loadKnowledgeGraph} className="refresh-button">
-            🔄 Load Demo
-          </button>
+          <div className="filter-actions">
+            <button onClick={loadAdvancedKnowledgeGraph} className="refresh-button advanced">
+              🔄 Regenerate Analysis
+            </button>
+            <button onClick={loadProductionDemo} className="demo-button compact">
+              🎭 Load Demo
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="main-content">
-        {/* Graph Visualization */}
-        <div className="graph-container">
+      <div className="main-content advanced">
+        {/* Graph Container */}
+        <div className="graph-container advanced">
           {loading && (
-            <div className="loading-overlay">
-              <div className="loading-spinner"></div>
-              <p>🤖 AI is analyzing story connections...</p>
-              <div className="loading-tips">
-                <p>💡 While you wait: Stories are being analyzed for economic, political, social, and thematic relationships</p>
+            <div className="loading-overlay advanced">
+              <div className="loading-content">
+                <div className="loading-spinner advanced"></div>
+                <h3>🤖 Advanced AI Analysis in Progress</h3>
+                <div className="loading-steps">
+                  <div className="loading-step">📊 Fetching from multiple sources...</div>
+                  <div className="loading-step">🧠 Analyzing story relationships...</div>
+                  <div className="loading-step">⚖️ Calculating confidence scores...</div>
+                  <div className="loading-step">🎨 Generating visualization...</div>
+                </div>
               </div>
             </div>
           )}
-          <svg ref={svgRef} className="graph-svg"></svg>
+          <svg ref={svgRef} className="graph-svg advanced"></svg>
           
-          {/* Graph Info */}
+          {/* Enhanced Info Panel */}
           {graphData.metadata && (
-            <div className="graph-info">
-              <div className="info-item">
-                <span className="info-label">📰 Stories:</span>
-                <span className="info-value">{graphData.metadata.total_articles || 0}</span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">🔗 Connections:</span>
-                <span className="info-value">{graphData.metadata.total_connections || 0}</span>
-              </div>
-              <div className="info-item">
-                <span className="info-label">🤖 AI Analysis:</span>
-                <span className="info-value">
-                  {graphData.metadata.ai_analysis_enabled ? '✅ Active' : '❌ Offline'}
-                </span>
-              </div>
-              {graphData.metadata.demo_mode && (
+            <div className="graph-info advanced">
+              <div className="info-header">📊 Analysis Summary</div>
+              <div className="info-grid">
                 <div className="info-item">
-                  <span className="info-label">🎭 Mode:</span>
-                  <span className="info-value">Demo</span>
+                  <span className="info-label">📰 Articles:</span>
+                  <span className="info-value">{graphData.metadata.total_articles || 0}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">🔗 Connections:</span>
+                  <span className="info-value">{graphData.metadata.total_connections || 0}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">📡 Sources:</span>
+                  <span className="info-value">{graphData.metadata.total_sources || 1}</span>
+                </div>
+                <div className="info-item">
+                  <span className="info-label">🤖 AI Status:</span>
+                  <span className="info-value">
+                    {graphData.metadata.ai_analysis_enabled ? '✅ Active' : '❌ Offline'}
+                  </span>
+                </div>
+              </div>
+              
+              {graphData.metadata.advanced_features && (
+                <div className="advanced-features">
+                  <div className="features-label">🚀 Advanced Features:</div>
+                  <div className="features-list">
+                    {Object.entries(graphData.metadata.advanced_features).map(([feature, enabled]) => (
+                      <span key={feature} className={`feature-badge ${enabled ? 'enabled' : 'disabled'}`}>
+                        {feature.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           )}
-          
-          {/* Interactive Instructions */}
-          <div className="interaction-guide">
-            <div className="guide-item">
-              <span className="guide-icon">🖱️</span>
-              <span>Hover circles for connections</span>
-            </div>
-            <div className="guide-item">
-              <span className="guide-icon">👆</span>
-              <span>Click articles for details</span>
-            </div>
-            <div className="guide-item">
-              <span className="guide-icon">🔄</span>
-              <span>Drag to reposition</span>
-            </div>
-          </div>
         </div>
 
-        {/* Story Detail Panel */}
+        {/* Enhanced Story Detail Panel */}
         {selectedNode && selectedNode.type === 'article' && (
-          <div className="detail-panel">
-            <div className="detail-header">
-              <h3>{selectedNode.title}</h3>
+          <div className="detail-panel advanced">
+            <div className="detail-header advanced">
+              <div className="header-main">
+                <div className="source-indicator">
+                  <span className={`source-badge ${selectedNode.source}`}>
+                    {selectedNode.source === 'nyt' ? '🇺🇸 NYT' : '🇬🇧 Guardian'}
+                  </span>
+                  <span className="complexity-indicator">
+                    Level {selectedNode.complexity_level || 3}/5
+                  </span>
+                </div>
+                <h3>{selectedNode.title}</h3>
+              </div>
               <button 
                 className="close-button"
                 onClick={() => setSelectedNode(null)}
@@ -582,26 +911,51 @@ const App = () => {
               </button>
             </div>
             
-            <div className="detail-content">
-              <div className="story-meta">
+            <div className="detail-content advanced">
+              <div className="story-meta advanced">
                 <span className="section-badge">{selectedNode.section}</span>
                 <span className="date">
                   {new Date(selectedNode.publication_date).toLocaleDateString()}
                 </span>
+                {selectedNode.author && (
+                  <span className="author">By {selectedNode.author}</span>
+                )}
+                <span className="read-time">
+                  📖 {selectedNode.read_time_minutes || 3} min read
+                </span>
               </div>
 
-              <div className="ai-analysis-badge">
+              {selectedNode.sentiment_score !== undefined && (
+                <div className="sentiment-analysis">
+                  <h4>📊 Sentiment Analysis</h4>
+                  <div className="sentiment-bar">
+                    <div 
+                      className="sentiment-fill"
+                      style={{
+                        width: `${((selectedNode.sentiment_score + 1) / 2) * 100}%`,
+                        backgroundColor: selectedNode.sentiment_score > 0 ? '#27ae60' : selectedNode.sentiment_score < 0 ? '#e74c3c' : '#95a5a6'
+                      }}
+                    ></div>
+                  </div>
+                  <span className="sentiment-label">
+                    {selectedNode.sentiment_score > 0.2 ? '😊 Positive' : 
+                     selectedNode.sentiment_score < -0.2 ? '😟 Negative' : '😐 Neutral'}
+                  </span>
+                </div>
+              )}
+
+              <div className="ai-analysis-badge advanced">
                 <span className="ai-icon">🤖</span>
-                <span>AI-Generated Analysis</span>
+                <span>AI-Generated Analysis • Complexity Level {selectedNode.complexity_level || 3}</span>
               </div>
 
               <div className="story-lede">
-                <h4>📰 Lede (Opening Hook)</h4>
+                <h4>📰 Lede</h4>
                 <p>{selectedNode.lede}</p>
               </div>
 
               <div className="story-nutgraf">
-                <h4>🎯 Nutgraf (Why It Matters)</h4>
+                <h4>🎯 Why This Matters</h4>
                 <p>{selectedNode.nutgraf}</p>
               </div>
 
@@ -610,32 +964,42 @@ const App = () => {
                 <p>{selectedNode.summary}</p>
               </div>
 
+              {selectedNode.entities && selectedNode.entities.length > 0 && (
+                <div className="entities-section">
+                  <h4>🏷️ Key Entities</h4>
+                  <div className="entities-list">
+                    {selectedNode.entities.map((entity, index) => (
+                      <span key={index} className="entity-tag">{entity}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="story-engagement">
                 <h4>📱 Social Media Preview</h4>
-                <p className="engagement-preview">{selectedNode.engagement_preview}</p>
+                <p className="engagement-preview advanced">{selectedNode.engagement_preview}</p>
               </div>
 
-              <div className="story-actions">
+              <div className="story-actions advanced">
                 <a 
                   href={selectedNode.url} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="read-full-button"
+                  className="read-full-button advanced"
                 >
                   📖 Read Full Article
                 </a>
                 <button 
                   className="connection-button"
                   onClick={() => {
-                    // Highlight connections for this story
-                    const svg = d3.select(svgRef.current);
-                    svg.selectAll('.link')
-                      .style('stroke-opacity', link => 
-                        link.source.id === selectedNode.id || link.target.id === selectedNode.id ? 1 : 0.1
-                      );
+                    // Highlight connections
+                    trackAnalytics('explore_connection', { 
+                      story_id: selectedNode.id,
+                      action: 'highlight_connections' 
+                    });
                   }}
                 >
-                  🔗 Show Connections
+                  🔗 Show All Connections
                 </button>
               </div>
             </div>
@@ -644,8 +1008,8 @@ const App = () => {
       </div>
 
       {/* Enhanced Legend */}
-      <div className="legend">
-        <h4>🎨 Connection Types</h4>
+      <div className="legend advanced">
+        <h4>🎨 Advanced Connection Types</h4>
         <div className="legend-items">
           <div className="legend-item">
             <div className="legend-line" style={{backgroundColor: '#f39c12'}}></div>
@@ -668,26 +1032,17 @@ const App = () => {
             <span>⚡ Causal</span>
           </div>
           <div className="legend-item">
-            <div className="legend-line" style={{backgroundColor: '#e67e22'}}></div>
-            <span>🎭 Thematic</span>
+            <div className="legend-line" style={{backgroundColor: '#1abc9c'}}></div>
+            <span>📍 Geographic</span>
           </div>
         </div>
-        <div className="legend-explanation">
+        <div className="legend-explanation advanced">
           <p className="legend-note">
             📏 <strong>Line thickness = connection strength</strong><br/>
-            🔍 Thick lines = strong relationships • Thin lines = subtle connections
+            ⚖️ <strong>Solid lines = high confidence • Dashed = lower confidence</strong><br/>
+            🏷️ <strong>Source badges indicate article origins</strong>
           </p>
         </div>
-      </div>
-
-      {/* Call-to-Action for Feedback */}
-      <div className="floating-feedback">
-        <button 
-          className="floating-feedback-button"
-          onClick={() => setShowFeedback(true)}
-        >
-          💬 Quick Feedback
-        </button>
       </div>
     </div>
   );

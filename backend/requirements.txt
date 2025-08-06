@@ -6,3 +6,5 @@ python-dotenv==1.0.0
 pydantic==2.5.0
 python-multipart==0.0.6
 emergentintegrations --extra-index-url https://d33sy5i8bnduwe.cloudfront.net/simple/
+aioredis==2.0.1
+python-dateutil==2.8.2
