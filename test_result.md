@@ -207,9 +207,11 @@ metadata:
 
 test_plan:
   current_focus:
+    - "Enhanced API v4 Integration"
   stuck_tasks:
+    - "Enhanced API v4 Integration"
   test_all: false
-  test_priority: "high_first"
+  test_priority: "stuck_first"
 
 agent_communication:
   - agent: "main"
