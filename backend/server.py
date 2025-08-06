@@ -701,20 +701,29 @@ class UltimateNewsProcessor:
             return None
     
     async def create_ultimate_knowledge_graph(self, stories: List[EnhancedStory], raw_stories: List[Dict], user_prefs: UserPreferences) -> Dict[str, Any]:
-        """Create the ultimate knowledge graph with all advanced features"""
+        """Create causal relationship knowledge graph with topic clustering"""
         
-        # Create enhanced nodes with all metadata
+        # Create enhanced nodes with full headlines and topic classification
         nodes = []
+        topic_clusters = {}
+        
         for story in stories:
+            # Classify story into topic clusters
+            topic = self._classify_story_topic(story)
+            if topic not in topic_clusters:
+                topic_clusters[topic] = []
+            topic_clusters[topic].append(story.id)
+            
             node = {
                 "id": story.id,
                 "type": "article",
                 "source": story.source,
-                "title": story.title,
+                "title": story.title,  # Full headline - no truncation
                 "summary": story.summary,
                 "lede": story.lede,
                 "nutgraf": story.nutgraf,
                 "section": story.section,
+                "topic_cluster": topic,
                 "publication_date": story.publication_date.isoformat(),
                 "url": story.url,
                 "author": story.author,
@@ -722,43 +731,45 @@ class UltimateNewsProcessor:
                 "sentiment_score": story.sentiment_score,
                 "complexity_level": story.complexity_level,
                 "read_time_minutes": story.read_time_minutes,
-                "size": 15 + (story.complexity_level * 4) + (len(story.categories) * 3),
-                "color": self._get_enhanced_color(story.source, story.section, story.sentiment_score),
+                "size": max(20, min(50, len(story.title) // 3)),  # Size based on headline length
+                "color": self._get_topic_color(topic, story.sentiment_score),
                 "entities": story.entities,
                 "categories": story.categories,
                 "geographic_info": story.geographic_info.dict() if story.geographic_info else None,
-                "influence_metrics": story.influence_metrics
+                "influence_metrics": story.influence_metrics,
+                # Clustering position hints
+                "cluster_x": self._get_cluster_x_position(topic),
+                "cluster_y": self._get_cluster_y_position(topic)
             }
             nodes.append(node)
         
-        # Create section, source, and topic nodes
-        sections = list(set(story.section for story in stories))
-        sources = list(set(story.source for story in stories))
+        # Create topic cluster nodes
+        cluster_nodes = []
+        for topic, story_ids in topic_clusters.items():
+            if len(story_ids) > 1:  # Only create cluster nodes for topics with multiple stories
+                cluster_nodes.append({
+                    "id": f"cluster_{topic.lower().replace(' ', '_')}",
+                    "type": "topic_cluster", 
+                    "title": topic,
+                    "size": 60 + len(story_ids) * 5,
+                    "color": self._get_topic_cluster_color(topic),
+                    "story_count": len(story_ids),
+                    "x": self._get_cluster_x_position(topic),
+                    "y": self._get_cluster_y_position(topic)
+                })
         
-        for section in sections:
-            nodes.append({
-                "id": f"section_{section.lower().replace(' ', '_')}",
-                "type": "section",
-                "title": section,
-                "size": 35,
-                "color": self._get_section_color(section)
-            })
+        nodes.extend(cluster_nodes)
         
-        for source in sources:
-            nodes.append({
-                "id": f"source_{source}",
-                "type": "source",
-                "title": source.upper(),
-                "size": 45,
-                "color": self._get_source_color(source)
-            })
-        
-        # Generate advanced connections
+        # Generate causal connections with enhanced focus on causality
         edges = []
         if ai_analyzer and len(raw_stories) > 1:
             connections = await ai_analyzer.analyze_story_connections(raw_stories, user_prefs)
             
             for connection in connections:
+                # Enhanced causality visualization
+                causal_types = ['causal', 'economic_causal', 'political_causal', 'social_causal', 'environmental_causal', 'indirect_causal']
+                is_causal = connection.connection_type in causal_types
+                
                 edge = {
                     "source": connection.source_id,
                     "target": connection.target_id,
@@ -768,9 +779,13 @@ class UltimateNewsProcessor:
                     "explanation": connection.explanation,
                     "keywords": connection.keywords,
                     "evidence_score": connection.evidence_score,
-                    "width": max(2, connection.strength * 12),
-                    "opacity": 0.2 + (connection.confidence * 0.8),
-                    "temporal_relationship": connection.temporal_relationship
+                    "temporal_relationship": connection.temporal_relationship,
+                    "is_causal": is_causal,
+                    # Enhanced visual properties for causality
+                    "width": max(3, connection.strength * 15) if is_causal else max(1, connection.strength * 8),
+                    "opacity": 0.3 + (connection.confidence * 0.7),
+                    "stroke_style": "solid" if is_causal else "dashed",
+                    "causal_indicator": "→" if is_causal else "↔"
                 }
                 
                 if connection.geographic_overlap:
@@ -778,57 +793,45 @@ class UltimateNewsProcessor:
                 
                 edges.append(edge)
         
-        # Add structural edges
+        # Add cluster membership edges (lighter connections)
         for story in stories:
-            # Article to section
-            edges.append({
-                "source": story.id,
-                "target": f"section_{story.section.lower().replace(' ', '_')}",
-                "type": "belongs_to_section",
-                "strength": 1.0,
-                "width": 2,
-                "opacity": 0.3
-            })
-            
-            # Article to source
-            edges.append({
-                "source": story.id,
-                "target": f"source_{story.source}",
-                "type": "belongs_to_source",
-                "strength": 1.0,
-                "width": 3,
-                "opacity": 0.4
-            })
+            cluster_id = f"cluster_{self._classify_story_topic(story).lower().replace(' ', '_')}"
+            if any(node["id"] == cluster_id for node in nodes):
+                edges.append({
+                    "source": story.id,
+                    "target": cluster_id,
+                    "type": "belongs_to_cluster",
+                    "strength": 0.3,
+                    "width": 1,
+                    "opacity": 0.2,
+                    "stroke_style": "dotted"
+                })
         
-        # Get advanced analytics
-        trending_topics = await real_time_analytics.detect_trending_topics(raw_stories)
-        geographic_data = await geographic_analyzer.analyze_geographic_patterns(raw_stories)
-        temporal_data = await temporal_analyzer.create_story_timeline(raw_stories)
+        # Enhanced metadata with topic analysis
+        topic_distribution = {topic: len(story_ids) for topic, story_ids in topic_clusters.items()}
+        causal_connections = [e for e in edges if e.get("is_causal", False)]
         
         return {
             "nodes": nodes,
             "edges": edges,
             "metadata": {
                 "total_articles": len(stories),
-                "total_sections": len(sections),
-                "total_sources": len(sources),
-                "total_connections": len([e for e in edges if e["type"] not in ["belongs_to_section", "belongs_to_source"]]),
+                "total_clusters": len(topic_clusters),
+                "total_causal_connections": len(causal_connections),
+                "total_all_connections": len([e for e in edges if e["type"] != "belongs_to_cluster"]),
                 "generated_at": datetime.now().isoformat(),
                 "ai_analysis_enabled": ai_analyzer is not None,
                 "user_preferences": user_prefs.dict(),
+                "topic_distribution": topic_distribution,
+                "causality_focus": True,
+                "clustering_method": "topic_based",
                 "advanced_features": {
-                    "multi_source": True,
-                    "geographic_analysis": True,
-                    "temporal_analysis": True,
-                    "sentiment_analysis": True,
-                    "complexity_adaptation": True,
-                    "confidence_scoring": True,
-                    "influence_metrics": True,
-                    "real_time_analytics": True
-                },
-                "trending_topics": [topic.dict() for topic in trending_topics[:5]],
-                "geographic_insights": geographic_data,
-                "temporal_analysis": temporal_data
+                    "full_headlines": True,
+                    "topic_clustering": True,
+                    "causal_analysis": True,
+                    "interactive_expansion": True,
+                    "strength_visualization": True
+                }
             }
         }
     
