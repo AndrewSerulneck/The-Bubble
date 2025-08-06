@@ -1034,40 +1034,42 @@ const App = () => {
         )}
       </div>
 
-      {/* Enhanced Legend */}
+      {/* Enhanced Legend for Causality */}
       <div className="legend advanced">
-        <h4>🎨 Advanced Connection Types</h4>
+        <h4>🔗 Causal Connection Types</h4>
         <div className="legend-items">
           <div className="legend-item">
-            <div className="legend-line" style={{backgroundColor: '#f39c12'}}></div>
-            <span>💰 Economic</span>
+            <div className="legend-line" style={{backgroundColor: '#e74c3c', height: '4px'}}></div>
+            <span>⚡ Direct Causal</span>
           </div>
           <div className="legend-item">
-            <div className="legend-line" style={{backgroundColor: '#3498db'}}></div>
-            <span>🏛️ Political</span>
+            <div className="legend-line" style={{backgroundColor: '#f39c12', height: '4px'}}></div>
+            <span>💰 Economic Causal</span>
           </div>
           <div className="legend-item">
-            <div className="legend-line" style={{backgroundColor: '#e74c3c'}}></div>
-            <span>👥 Social</span>
+            <div className="legend-line" style={{backgroundColor: '#3498db', height: '3px'}}></div>
+            <span>🏛️ Political Causal</span>
           </div>
           <div className="legend-item">
-            <div className="legend-line" style={{backgroundColor: '#27ae60'}}></div>
-            <span>🌍 Environmental</span>
+            <div className="legend-line" style={{backgroundColor: '#9b59b6', height: '3px'}}></div>
+            <span>👥 Social Causal</span>
           </div>
           <div className="legend-item">
-            <div className="legend-line" style={{backgroundColor: '#9b59b6'}}></div>
-            <span>⚡ Causal</span>
+            <div className="legend-line" style={{backgroundColor: '#27ae60', height: '3px'}}></div>
+            <span>🌍 Environmental Causal</span>
           </div>
           <div className="legend-item">
-            <div className="legend-line" style={{backgroundColor: '#1abc9c'}}></div>
-            <span>📍 Geographic</span>
+            <div className="legend-line" style={{backgroundColor: '#e67e22', height: '2px'}}></div>
+            <span>🔄 Indirect Causal</span>
           </div>
         </div>
         <div className="legend-explanation advanced">
           <p className="legend-note">
-            📏 <strong>Line thickness = connection strength</strong><br/>
-            ⚖️ <strong>Solid lines = high confidence • Dashed = lower confidence</strong><br/>
-            🏷️ <strong>Source badges indicate article origins</strong>
+            📏 <strong>Line thickness = causality strength</strong><br/>
+            🎯 <strong>Full headlines displayed in bubbles</strong><br/>
+            🏷️ <strong>Stories clustered by topic (Business, Politics, Culture, etc.)</strong><br/>
+            ✨ <strong>Hover over bubbles to see expanded summaries</strong><br/>
+            🔗 <strong>Every story connects to others - showing the web of causality</strong>
           </p>
         </div>
       </div>
