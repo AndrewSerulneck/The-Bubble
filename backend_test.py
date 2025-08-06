@@ -572,12 +572,18 @@ class NewsKnowledgeGraphTester:
 
     def run_all_tests(self):
         """Run all backend tests"""
-        print("🚀 Starting News Knowledge Graph Backend Tests")
+        print("🚀 Starting News Knowledge Graph Backend Tests - Ultimate Edition")
         print(f"📍 Testing against: {self.base_url}")
-        print("=" * 60)
+        print(f"🔑 NYT API Key: {self.nyt_api_key}")
+        print("=" * 80)
         
-        # Test sequence
+        # Test sequence - prioritizing NYT and complexity features
         tests = [
+            self.test_ultimate_health_check,
+            self.test_nyt_api_integration,
+            self.test_multi_source_integration,
+            self.test_complexity_levels,
+            self.test_ultimate_demo_endpoint,
             self.test_health_check,
             self.test_knowledge_graph_default,
             self.test_search_functionality,
@@ -592,9 +598,9 @@ class NewsKnowledgeGraphTester:
                 self.log_test(f"Test {test.__name__}", False, f"Test crashed: {str(e)}")
         
         # Print summary
-        print("\n" + "=" * 60)
-        print("📊 TEST SUMMARY")
-        print("=" * 60)
+        print("\n" + "=" * 80)
+        print("📊 ULTIMATE TEST SUMMARY")
+        print("=" * 80)
         print(f"Tests Run: {self.tests_run}")
         print(f"Tests Passed: {self.tests_passed}")
         print(f"Tests Failed: {self.tests_run - self.tests_passed}")
@@ -606,6 +612,13 @@ class NewsKnowledgeGraphTester:
             print("\n❌ FAILED TESTS:")
             for test in failed_tests:
                 print(f"   • {test['name']}: {test['details']}")
+        
+        # Print passed tests summary
+        passed_tests = [t for t in self.test_results if t['success']]
+        if passed_tests:
+            print(f"\n✅ PASSED TESTS ({len(passed_tests)}):")
+            for test in passed_tests:
+                print(f"   • {test['name']}")
         
         return self.tests_passed == self.tests_run
 
