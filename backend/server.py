@@ -595,6 +595,96 @@ class UltimateNewsProcessor:
                 pass
         cache[cache_key] = data
     
+    async def process_multi_source_stories_fast(self, guardian_stories: List[Dict], nyt_stories: List[Dict], user_prefs: UserPreferences) -> List[EnhancedStory]:
+        """Fast parallel processing of stories for better performance"""
+        all_stories = []
+        
+        # Process stories in parallel batches for speed
+        tasks = []
+        
+        # Guardian stories
+        for story in guardian_stories[:6]:  # Limit for speed
+            tasks.append(self._process_guardian_story_fast(story, user_prefs))
+        
+        # NYT stories
+        for story in nyt_stories[:6]:  # Limit for speed
+            tasks.append(self._process_nyt_story_fast(story, user_prefs))
+        
+        # Process all stories in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        for result in results:
+            if isinstance(result, EnhancedStory):
+                all_stories.append(result)
+            elif isinstance(result, Exception):
+                logger.warning(f"Story processing failed: {result}")
+        
+        return all_stories
+    
+    async def _process_guardian_story_fast(self, story: Dict, user_prefs: UserPreferences) -> Optional[EnhancedStory]:
+        """Fast Guardian story processing with minimal AI calls"""
+        try:
+            title = story.get("webTitle", "")
+            if not title:
+                return None
+            
+            # Skip AI content generation for very fast processing
+            # Use simple rule-based content instead
+            content = story.get("fields", {}).get("standfirst", "") or title
+            
+            return EnhancedStory(
+                id=story.get("id", ""),
+                source="guardian",
+                title=title,
+                summary=content[:200] if content else title,
+                lede=title,
+                nutgraf=f"This {story.get('sectionName', 'news')} story covers recent developments.",
+                section=story.get("sectionName", "news"),
+                publication_date=datetime.fromisoformat(story.get("webPublicationDate", "").replace("Z", "+00:00")) if story.get("webPublicationDate") else datetime.now(),
+                url=story.get("webUrl", ""),
+                author=story.get("fields", {}).get("byline"),
+                entities=[],
+                categories=[story.get("sectionName", "news")],
+                engagement_preview=f"📰 {title[:150]}",
+                complexity_level=user_prefs.complexity_level,
+                read_time_minutes=3
+            )
+        except Exception as e:
+            logger.error(f"Error processing Guardian story: {e}")
+            return None
+    
+    async def _process_nyt_story_fast(self, story: Dict, user_prefs: UserPreferences) -> Optional[EnhancedStory]:
+        """Fast NYT story processing with minimal AI calls"""
+        try:
+            headline = story.get("headline", {})
+            title = headline.get("main", "") if headline else ""
+            if not title:
+                return None
+            
+            # Skip AI for speed
+            content = story.get("lead_paragraph", "") or story.get("snippet", "") or title
+            
+            return EnhancedStory(
+                id=story.get("_id", ""),
+                source="nyt",
+                title=title,
+                summary=content[:200] if content else title,
+                lede=title,
+                nutgraf=f"This {story.get('section_name', 'news')} story covers recent developments.",
+                section=story.get("section_name", "news"),
+                publication_date=datetime.fromisoformat(story.get("pub_date", "").replace("Z", "+00:00")) if story.get("pub_date") else datetime.now(),
+                url=story.get("web_url", ""),
+                author=story.get("byline", {}).get("original") if story.get("byline") else None,
+                entities=[],
+                categories=[story.get("section_name", "news")],
+                engagement_preview=f"📰 {title[:150]}",
+                complexity_level=user_prefs.complexity_level,
+                read_time_minutes=3
+            )
+        except Exception as e:
+            logger.error(f"Error processing NYT story: {e}")
+            return None
+    
     async def process_multi_source_stories(self, guardian_stories: List[Dict], nyt_stories: List[Dict], user_prefs: UserPreferences) -> List[EnhancedStory]:
         all_stories = []
         
