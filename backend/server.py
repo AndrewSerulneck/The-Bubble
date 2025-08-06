@@ -72,8 +72,8 @@ redis_client = None
 try:
     import aioredis
     redis_client = aioredis.from_url("redis://localhost:6379", decode_responses=True)
-except ImportError:
-    logger.info("Redis not available, using in-memory caching")
+except (ImportError, TypeError) as e:
+    logger.info(f"Redis not available, using in-memory caching: {e}")
 
 # In-memory cache fallback
 cache = {}
