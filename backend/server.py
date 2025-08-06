@@ -312,68 +312,53 @@ Always return comprehensive structured JSON."""
 
     # Keep existing methods but enhance them
     async def analyze_story_connections(self, stories: List[Dict], user_prefs: UserPreferences) -> List[AdvancedConnection]:
-        """Enhanced causal relationship analysis - finds connections between ALL stories"""
+        """Optimized causal relationship analysis - faster processing"""
         if len(stories) < 2:
             return []
         
+        # Limit stories for faster processing
         story_data = []
-        for story in stories[:15]:  # Analyze more stories for comprehensive connections
+        for story in stories[:8]:  # Reduced from 15 to 8 for speed
             content = self._extract_content(story)
             
             story_info = {
                 "id": story.get("id", ""),
                 "title": story.get("webTitle", "") or story.get("headline", {}).get("main", ""),
-                "content": content[:1500],  # More content for better analysis
+                "content": content[:800],  # Reduced content length for faster processing
                 "source": story.get("source", "guardian"),
                 "section": story.get("sectionName", "") or story.get("section_name", ""),
-                "pub_date": story.get("webPublicationDate", "") or story.get("pub_date", ""),
-                "keywords": self._extract_keywords(story),
-                "location_mentions": self._extract_locations(content),
-                "entities": self._extract_entities(content),
-                "economic_indicators": self._extract_economic_indicators(content),
-                "political_entities": self._extract_political_entities(content)
+                "keywords": self._extract_keywords(story)[:3],  # Limit keywords
+                "entities": self._extract_entities(content)[:3]   # Limit entities
             }
             story_data.append(story_info)
         
-        # Enhanced prompt specifically for causal relationship analysis
-        analysis_prompt = f"""You are an expert analyst specializing in CAUSAL RELATIONSHIPS between news events. Analyze these {len(story_data)} stories and find ALL possible causal connections, including non-obvious ones.
+        # Optimized, concise prompt for faster AI processing
+        analysis_prompt = f"""Find causal connections between these {len(story_data)} stories. Focus on DIRECT causality.
 
-STORIES TO ANALYZE:
-{json.dumps(story_data, indent=2)}
-
-TASK: Find causal relationships where one event CAUSES or INFLUENCES another event. Think broadly about:
-- Economic causality (oil prices → manufacturing costs → consumer prices)
-- Political causality (policy changes → market reactions → business decisions)  
-- Social causality (cultural events → behavioral changes → economic impacts)
-- Environmental causality (climate events → agricultural changes → food prices)
-- Technological causality (innovations → industry disruption → job market changes)
-- Geopolitical causality (conflicts → commodity prices → global markets)
-
-IMPORTANT: Every story should connect to at least one other story. Look for indirect causality chains.
+STORIES:
+{json.dumps(story_data, indent=1)}
 
 Return JSON array of causal connections:
 [{{
   "source_id": "story1_id",
   "target_id": "story2_id", 
-  "connection_type": "causal|economic_causal|political_causal|social_causal|environmental_causal|indirect_causal",
-  "causality_strength": 0.3-1.0,
+  "connection_type": "causal|economic_causal|political_causal",
+  "causality_strength": 0.4-1.0,
   "evidence_score": 0.4-1.0,
-  "causal_explanation": "Detailed explanation of HOW story1 causes or influences story2",
-  "causal_chain": ["intermediate step 1", "intermediate step 2"],
-  "time_lag": "immediate|hours|days|weeks|months",
-  "keywords": ["keyword1", "keyword2", "keyword3"]
+  "causal_explanation": "Brief explanation of how story1 causes story2"
 }}]
 
-FOCUS ON CAUSALITY: Prioritize connections where one event directly or indirectly CAUSES another.
-COMPREHENSIVENESS: Ensure every story connects to others - no isolated bubbles.
-Maximum 20 connections. Minimum causality_strength of 0.4."""
+Rules:
+- Maximum 6 connections for speed
+- Only include connections with causality_strength > 0.5
+- Ensure every story connects to at least one other"""
 
         try:
             user_message = UserMessage(text=analysis_prompt)
             response = await self.claude_chat.send_message(user_message)
             
             response_text = response.strip()
-            logger.info(f"Claude causal analysis: {len(response_text)} chars")
+            logger.info(f"Claude fast analysis: {len(response_text)} chars")
             
             if response_text.startswith('['):
                 connections_data = json.loads(response_text)
@@ -383,7 +368,7 @@ Maximum 20 connections. Minimum causality_strength of 0.4."""
                 if json_match:
                     connections_data = json.loads(json_match.group())
                 else:
-                    return []
+                    return self._create_fallback_connections(stories)
             
             connections = []
             for conn in connections_data:
@@ -396,16 +381,49 @@ Maximum 20 connections. Minimum causality_strength of 0.4."""
                         confidence=float(conn.get("evidence_score", 0.7)),
                         explanation=conn.get("causal_explanation", "AI-detected causal relationship"),
                         keywords=conn.get("keywords", []),
-                        temporal_relationship=conn.get("time_lag", "unknown"),
+                        temporal_relationship="unknown",
                         evidence_score=float(conn.get("evidence_score", 0.7))
                     ))
             
-            logger.info(f"Generated {len(connections)} causal connections")
+            logger.info(f"Generated {len(connections)} fast causal connections")
             return connections
             
         except Exception as e:
-            logger.error(f"Causal connection analysis error: {e}")
-            return []
+            logger.error(f"Fast causal analysis error: {e}")
+            return self._create_fallback_connections(stories)
+    
+    def _create_fallback_connections(self, stories: List[Dict]) -> List[AdvancedConnection]:
+        """Create simple rule-based connections when AI fails - for speed"""
+        connections = []
+        
+        # Group stories by section for quick connections
+        sections = {}
+        for story in stories[:6]:
+            section = story.get("sectionName", "") or story.get("section_name", "")
+            if section not in sections:
+                sections[section] = []
+            sections[section].append(story.get("id", ""))
+        
+        # Create connections within sections (faster than AI analysis)
+        for section, story_ids in sections.items():
+            if len(story_ids) > 1:
+                for i in range(len(story_ids) - 1):
+                    connection_type = "economic_causal" if "business" in section.lower() else \
+                                   "political_causal" if "politics" in section.lower() else "causal"
+                    
+                    connections.append(AdvancedConnection(
+                        source_id=story_ids[i],
+                        target_id=story_ids[i + 1],
+                        connection_type=connection_type,
+                        strength=0.6,
+                        confidence=0.7,
+                        explanation=f"Related stories in {section} section",
+                        keywords=[],
+                        temporal_relationship="concurrent",
+                        evidence_score=0.6
+                    ))
+        
+        return connections[:6]  # Limit for speed
     
     async def create_enhanced_content(self, story: Dict, complexity_level: int = 3) -> Dict[str, Any]:
         title = story.get("webTitle", "") or story.get("headline", {}).get("main", "")
