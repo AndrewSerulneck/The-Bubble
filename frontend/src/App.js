@@ -103,7 +103,7 @@ const App = () => {
       if (section) params.append('section', section);
       if (geographicFocus) params.append('geographic_focus', geographicFocus);
 
-      const response = await fetch(`${backendUrl}/api/v3/knowledge-graph/advanced?${params}`);
+      const response = await fetch(`${backendUrl}/api/v4/knowledge-graph/ultimate?${params}`);
       
       if (!response.ok) {
         throw new Error('API error, loading demo data');
