@@ -1839,12 +1839,13 @@ async def search_ultimate_news(
         guardian_stories = [s for s in all_results if 'webTitle' in s]
         nyt_stories = [s for s in all_results if 'headline' in s]
         
-        processed_stories = await news_processor.process_multi_source_stories(
+        # Massive parallel processing
+        processed_stories = await news_processor.process_massive_story_collection(
             guardian_stories, nyt_stories, user_prefs
         )
         
-        # Create knowledge graph
-        knowledge_graph = await news_processor.create_ultimate_knowledge_graph(
+        # Create comprehensive knowledge graph with advanced clustering
+        knowledge_graph = await news_processor.create_massive_knowledge_graph(
             processed_stories, all_results, user_prefs
         )
         
