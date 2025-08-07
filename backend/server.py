@@ -3420,12 +3420,12 @@ async def get_advanced_knowledge_graph(
             raw_stories.extend(nyt_stories)
         
         # Process stories
-        processed_stories = await news_processor.process_multi_source_stories(
+        processed_stories = await news_processor.process_massive_story_collection(
             guardian_stories, nyt_stories, user_prefs
         )
         
         # Create advanced knowledge graph
-        knowledge_graph = await news_processor.create_advanced_knowledge_graph(
+        knowledge_graph = await news_processor.create_massive_knowledge_graph(
             processed_stories, raw_stories, user_prefs
         )
         
