@@ -1329,6 +1329,217 @@ class UltimateNewsProcessor:
             'General News': 0.5
         }
         return positions.get(topic, 0.5)
+    
+    def _classify_story_topic_enhanced(self, story: EnhancedStory) -> str:
+        """Enhanced topic classification for massive datasets"""
+        section = story.section.lower()
+        title = story.title.lower()
+        entities = [e.lower() for e in story.entities]
+        
+        # Enhanced topic classification with more granular categories
+        if any(term in title for term in ['restaurant', 'food', 'dining', 'chef', 'cooking', 'recipe', 'cuisine']):
+            return 'Food & Dining'
+        elif any(term in title for term in ['fashion', 'style', 'clothing', 'designer', 'runway', 'beauty', 'luxury']):
+            return 'Fashion & Lifestyle'
+        elif any(term in section for term in ['business', 'finance', 'economy', 'money']) or \
+             any(term in title for term in ['market', 'stock', 'economy', 'business', 'company', 'earnings', 'profit', 'investment']):
+            return 'Business & Finance'
+        elif any(term in section for term in ['politics', 'government']) or \
+             any(term in title for term in ['election', 'congress', 'president', 'government', 'policy', 'vote', 'campaign']):
+            return 'Politics & Government'
+        elif any(term in section for term in ['culture', 'arts']) or \
+             any(term in title for term in ['art', 'museum', 'culture', 'theater', 'music', 'film', 'book', 'entertainment']):
+            return 'Arts & Culture'
+        elif any(term in section for term in ['technology', 'tech']) or \
+             any(term in title for term in ['technology', 'tech', 'ai', 'software', 'digital', 'internet', 'innovation']):
+            return 'Technology & Innovation'
+        elif any(term in section for term in ['environment', 'climate']) or \
+             any(term in title for term in ['climate', 'environment', 'green', 'carbon', 'renewable', 'sustainability']):
+            return 'Environment & Climate'
+        elif any(term in section for term in ['health', 'medicine']) or \
+             any(term in title for term in ['health', 'medical', 'doctor', 'hospital', 'disease', 'treatment', 'healthcare']):
+            return 'Health & Medicine'
+        elif any(term in section for term in ['sport', 'sports']) or \
+             any(term in title for term in ['sport', 'game', 'team', 'player', 'match', 'championship', 'olympics']):
+            return 'Sports & Recreation'
+        elif any(term in title for term in ['war', 'conflict', 'military', 'defense', 'security', 'terrorism', 'violence']):
+            return 'Security & Conflict'
+        elif any(term in title for term in ['education', 'school', 'university', 'student', 'teacher', 'learning']):
+            return 'Education & Learning'
+        elif any(term in title for term in ['travel', 'tourism', 'vacation', 'destination', 'hotel']):
+            return 'Travel & Tourism'
+        else:
+            return 'General News'
+    
+    def _extract_geographic_region(self, story: EnhancedStory) -> str:
+        """Extract geographic region from story content"""
+        title = story.title.lower()
+        section = story.section.lower()
+        
+        # Geographic classification based on content
+        if any(term in title for term in ['china', 'chinese', 'beijing', 'shanghai']):
+            return 'China'
+        elif any(term in title for term in ['russia', 'russian', 'moscow', 'putin']):
+            return 'Russia'
+        elif any(term in title for term in ['europe', 'european', 'eu', 'brexit', 'germany', 'france', 'uk', 'britain']):
+            return 'Europe'
+        elif any(term in title for term in ['india', 'indian', 'delhi', 'mumbai']):
+            return 'India'
+        elif any(term in title for term in ['japan', 'japanese', 'tokyo']):
+            return 'Japan'
+        elif any(term in title for term in ['africa', 'african', 'nigeria', 'south africa']):
+            return 'Africa'
+        elif any(term in title for term in ['middle east', 'israel', 'palestine', 'iran', 'saudi']):
+            return 'Middle East'
+        elif any(term in title for term in ['latin america', 'brazil', 'mexico', 'argentina']):
+            return 'Latin America'
+        elif any(term in title for term in ['canada', 'canadian']):
+            return 'Canada'
+        elif any(term in title for term in ['australia', 'australian']):
+            return 'Australia'
+        elif any(term in title for term in ['us', 'america', 'american', 'washington', 'new york']):
+            return 'United States'
+        else:
+            return 'Global'
+    
+    def _get_enhanced_topic_color(self, topic: str, sentiment: float = 0.0) -> str:
+        """Enhanced color scheme for massive datasets"""
+        base_colors = {
+            'Business & Finance': '#f39c12',
+            'Politics & Government': '#3498db',
+            'Fashion & Lifestyle': '#e91e63',
+            'Arts & Culture': '#9c27b0',
+            'Food & Dining': '#ff5722',
+            'Technology & Innovation': '#673ab7',
+            'Environment & Climate': '#4caf50',
+            'Health & Medicine': '#00bcd4',
+            'Sports & Recreation': '#8bc34a',
+            'Security & Conflict': '#f44336',
+            'Education & Learning': '#ff9800',
+            'Travel & Tourism': '#795548',
+            'General News': '#607d8b'
+        }
+        
+        base_color = base_colors.get(topic, '#95a5a6')
+        
+        # Sentiment-based color modification
+        if sentiment > 0.4:
+            return base_color  # Positive stories keep vibrant colors
+        elif sentiment < -0.4:
+            return '#d32f2f'  # Very negative stories get red
+        elif sentiment < -0.2:
+            return '#ff5722'  # Moderately negative get orange-red
+        
+        return base_color
+    
+    def _calculate_influence_score(self, story: EnhancedStory) -> float:
+        """Calculate influence score for massive datasets"""
+        score = 0.5  # Base score
+        
+        # Source influence
+        if story.source == 'nyt':
+            score += 0.2
+        elif story.source == 'guardian':
+            score += 0.15
+        
+        # Section influence
+        high_influence_sections = ['politics', 'business', 'world', 'technology']
+        if any(section in story.section.lower() for section in high_influence_sections):
+            score += 0.15
+        
+        # Title length and complexity
+        if len(story.title) > 80:
+            score += 0.1
+        
+        # Sentiment extremes tend to be more influential
+        if abs(story.sentiment_score) > 0.5:
+            score += 0.1
+        
+        return min(1.0, score)
+    
+    def _get_geographic_x_position(self, region: str) -> float:
+        """Get X position for geographic clustering"""
+        positions = {
+            'United States': 0.2,
+            'Europe': 0.5,
+            'China': 0.8,
+            'Russia': 0.7,
+            'India': 0.75,
+            'Japan': 0.85,
+            'Africa': 0.45,
+            'Middle East': 0.6,
+            'Latin America': 0.15,
+            'Canada': 0.25,
+            'Australia': 0.9,
+            'Global': 0.5
+        }
+        return positions.get(region, 0.5)
+    
+    def _get_geographic_y_position(self, region: str) -> float:
+        """Get Y position for geographic clustering"""
+        positions = {
+            'United States': 0.4,
+            'Europe': 0.2,
+            'China': 0.3,
+            'Russia': 0.15,
+            'India': 0.5,
+            'Japan': 0.25,
+            'Africa': 0.7,
+            'Middle East': 0.45,
+            'Latin America': 0.8,
+            'Canada': 0.1,
+            'Australia': 0.85,
+            'Global': 0.5
+        }
+        return positions.get(region, 0.5)
+    
+    def _get_geographic_cluster_color(self, region: str) -> str:
+        """Get color for geographic clusters"""
+        colors = {
+            'United States': '#2980b9',
+            'Europe': '#8e44ad',
+            'China': '#c0392b',
+            'Russia': '#d35400',
+            'India': '#f39c12',
+            'Japan': '#e74c3c',
+            'Africa': '#27ae60',
+            'Middle East': '#f1c40f',
+            'Latin America': '#e67e22',
+            'Canada': '#3498db',
+            'Australia': '#9b59b6',
+            'Global': '#34495e'
+        }
+        return colors.get(region, '#7f8c8d')
+    
+    async def _analyze_massive_story_connections(self, raw_stories: List[Dict], user_prefs: UserPreferences) -> List[AdvancedConnection]:
+        """Analyze connections for massive datasets with intelligent batching"""
+        if not ai_analyzer or len(raw_stories) < 2:
+            return []
+        
+        # Process in smaller batches for massive datasets
+        batch_size = 6  # Smaller batches for better performance
+        all_connections = []
+        
+        # Process stories in batches
+        for i in range(0, min(len(raw_stories), 30), batch_size):  # Limit to 30 stories max
+            batch = raw_stories[i:i + batch_size]
+            if len(batch) >= 2:
+                try:
+                    batch_connections = await ai_analyzer.analyze_story_connections(batch, user_prefs)
+                    all_connections.extend(batch_connections)
+                except Exception as e:
+                    logger.warning(f"Batch connection analysis failed: {e}")
+        
+        return all_connections[:20]  # Limit total connections for performance
+    
+    def _is_cross_source_connection(self, edge: Dict, stories: List[EnhancedStory]) -> bool:
+        """Check if connection is between different sources"""
+        source_story = next((s for s in stories if s.id == edge["source"]), None)
+        target_story = next((s for s in stories if s.id == edge["target"]), None)
+        
+        if source_story and target_story:
+            return source_story.source != target_story.source
+        return False
 
 # Initialize ultimate processor
 news_processor = UltimateNewsProcessor()
