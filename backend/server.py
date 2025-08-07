@@ -1331,6 +1331,194 @@ class UltimateNewsProcessor:
         return positions.get(topic, 0.5)
     
     def _classify_story_topic_enhanced(self, story: EnhancedStory) -> str:
+        """Enhanced topic classification for massive datasets with more granular categories"""
+        section = story.section.lower()
+        title = story.title.lower()
+        entities = [e.lower() for e in story.entities]
+        
+        # Enhanced classification with more categories
+        if any(term in title for term in ['restaurant', 'food', 'dining', 'chef', 'cooking', 'recipe', 'cuisine', 'culinary']):
+            return 'Restaurants & Food'
+        elif any(term in title for term in ['fashion', 'style', 'clothing', 'designer', 'runway', 'beauty', 'makeup', 'cosmetics']):
+            return 'Fashion & Style'
+        elif any(term in section for term in ['business', 'finance', 'economy', 'money', 'market']) or \
+             any(term in title for term in ['market', 'stock', 'economy', 'business', 'company', 'earnings', 'profit', 'revenue', 'investment']):
+            return 'Business & Economy'
+        elif any(term in section for term in ['politics', 'government', 'election']) or \
+             any(term in title for term in ['election', 'congress', 'president', 'government', 'policy', 'vote', 'campaign', 'senate']):
+            return 'Politics & Government'
+        elif any(term in section for term in ['culture', 'arts', 'entertainment']) or \
+             any(term in title for term in ['art', 'museum', 'culture', 'theater', 'music', 'film', 'movie', 'book', 'literature']):
+            return 'Culture & Arts'
+        elif any(term in section for term in ['technology', 'tech']) or \
+             any(term in title for term in ['technology', 'tech', 'ai', 'software', 'digital', 'internet', 'app', 'startup']):
+            return 'Technology'
+        elif any(term in section for term in ['environment', 'climate']) or \
+             any(term in title for term in ['climate', 'environment', 'green', 'carbon', 'renewable', 'sustainability', 'global warming']):
+            return 'Environment & Climate'
+        elif any(term in section for term in ['health', 'medicine', 'wellness']) or \
+             any(term in title for term in ['health', 'medical', 'doctor', 'hospital', 'disease', 'treatment', 'vaccine', 'mental health']):
+            return 'Health & Medicine'
+        elif any(term in section for term in ['sport', 'sports']) or \
+             any(term in title for term in ['sport', 'game', 'team', 'player', 'match', 'championship', 'league', 'tournament']):
+            return 'Sports'
+        elif any(term in title for term in ['war', 'conflict', 'military', 'defense', 'security', 'terrorism', 'violence', 'attack']):
+            return 'Security & Conflict'
+        elif any(term in title for term in ['travel', 'tourism', 'vacation', 'destination', 'hotel', 'airline']):
+            return 'Travel & Tourism'
+        elif any(term in title for term in ['education', 'school', 'university', 'college', 'student', 'teacher', 'learning']):
+            return 'Education'
+        elif any(term in title for term in ['science', 'research', 'study', 'discovery', 'innovation', 'breakthrough']):
+            return 'Science & Research'
+        else:
+            return 'General News'
+    
+    def _extract_geographic_region(self, story: EnhancedStory) -> str:
+        """Extract geographic region from story content"""
+        title = story.title.lower()
+        content = (story.summary or story.lede or '').lower()
+        
+        # Geographic keywords mapping
+        regions = {
+            'North America': ['usa', 'america', 'united states', 'canada', 'mexico', 'toronto', 'vancouver', 'new york', 'california', 'texas', 'florida'],
+            'Europe': ['europe', 'uk', 'britain', 'france', 'germany', 'italy', 'spain', 'london', 'paris', 'berlin', 'brexit', 'eu', 'european'],
+            'Asia Pacific': ['china', 'japan', 'korea', 'india', 'singapore', 'australia', 'tokyo', 'beijing', 'mumbai', 'sydney', 'asian'],
+            'Middle East': ['middle east', 'israel', 'palestine', 'iran', 'iraq', 'saudi', 'dubai', 'jerusalem', 'tehran', 'arab'],
+            'Africa': ['africa', 'south africa', 'nigeria', 'egypt', 'kenya', 'cairo', 'lagos', 'johannesburg', 'african'],
+            'Latin America': ['brazil', 'argentina', 'chile', 'colombia', 'peru', 'mexico city', 'sao paulo', 'buenos aires', 'latin america']
+        }
+        
+        for region, keywords in regions.items():
+            if any(keyword in title or keyword in content for keyword in keywords):
+                return region
+        
+        return 'Global'
+    
+    def _get_enhanced_topic_color(self, topic: str, sentiment: float = 0.0) -> str:
+        """Enhanced color scheme for massive visualization"""
+        base_colors = {
+            'Business & Economy': '#f39c12',
+            'Politics & Government': '#3498db', 
+            'Fashion & Style': '#e91e63',
+            'Culture & Arts': '#9c27b0',
+            'Restaurants & Food': '#ff5722',
+            'Technology': '#673ab7',
+            'Environment & Climate': '#4caf50',
+            'Health & Medicine': '#00bcd4',
+            'Sports': '#8bc34a',
+            'Security & Conflict': '#f44336',
+            'Travel & Tourism': '#ff9800',
+            'Education': '#2196f3',
+            'Science & Research': '#795548',
+            'General News': '#607d8b'
+        }
+        
+        base_color = base_colors.get(topic, '#95a5a6')
+        
+        # Sentiment-based color modification for negative stories
+        if sentiment < -0.3:
+            return '#d32f2f'  # Red for very negative stories
+        
+        return base_color
+    
+    def _calculate_influence_score(self, story: EnhancedStory) -> float:
+        """Calculate story influence score based on various factors"""
+        score = 0.5  # Base score
+        
+        # Source credibility
+        if story.source == 'nyt':
+            score += 0.2
+        elif story.source == 'guardian':
+            score += 0.15
+        
+        # Section importance
+        important_sections = ['politics', 'business', 'international', 'technology']
+        if any(section in story.section.lower() for section in important_sections):
+            score += 0.15
+        
+        # Headline length (longer headlines often indicate more important stories)
+        if len(story.title) > 80:
+            score += 0.1
+        
+        # Complexity level
+        score += story.complexity_level * 0.05
+        
+        # Entity count (more entities = more connected story)
+        score += min(0.1, len(story.entities) * 0.02)
+        
+        return min(1.0, score)
+    
+    def _get_geographic_x_position(self, region: str) -> float:
+        """Get X position for geographic clustering"""
+        positions = {
+            'North America': 0.2,
+            'Europe': 0.5,
+            'Asia Pacific': 0.8,
+            'Middle East': 0.6,
+            'Africa': 0.4,
+            'Latin America': 0.3,
+            'Global': 0.5
+        }
+        return positions.get(region, 0.5)
+    
+    def _get_geographic_y_position(self, region: str) -> float:
+        """Get Y position for geographic clustering"""
+        positions = {
+            'North America': 0.3,
+            'Europe': 0.2,
+            'Asia Pacific': 0.4,
+            'Middle East': 0.6,
+            'Africa': 0.8,
+            'Latin America': 0.7,
+            'Global': 0.5
+        }
+        return positions.get(region, 0.5)
+    
+    def _get_geographic_cluster_color(self, region: str) -> str:
+        """Get color for geographic clusters"""
+        colors = {
+            'North America': '#1f77b4',
+            'Europe': '#ff7f0e',
+            'Asia Pacific': '#2ca02c',
+            'Middle East': '#d62728',
+            'Africa': '#9467bd',
+            'Latin America': '#8c564b',
+            'Global': '#7f7f7f'
+        }
+        return colors.get(region, '#bcbd22')
+    
+    async def _analyze_massive_story_connections(self, stories: List[Dict], user_prefs: UserPreferences) -> List[AdvancedConnection]:
+        """Analyze connections for massive datasets with intelligent sampling"""
+        if len(stories) < 2:
+            return []
+        
+        # For massive datasets, analyze connections in strategic samples
+        # Take most recent stories + random sample for comprehensive coverage
+        recent_stories = sorted(stories, key=lambda x: x.get('webPublicationDate', x.get('pub_date', '')), reverse=True)[:50]
+        
+        # Add random sample from remaining stories for diversity
+        import random
+        remaining_stories = [s for s in stories if s not in recent_stories]
+        if remaining_stories:
+            sample_size = min(30, len(remaining_stories))
+            random_sample = random.sample(remaining_stories, sample_size)
+            analysis_stories = recent_stories + random_sample
+        else:
+            analysis_stories = recent_stories
+        
+        # Use existing connection analysis method
+        return await ai_analyzer.analyze_story_connections(analysis_stories[:25], user_prefs)
+    
+    def _is_cross_source_connection(self, edge: Dict, stories: List[EnhancedStory]) -> bool:
+        """Check if connection is between different news sources"""
+        source_story = next((s for s in stories if s.id == edge['source']), None)
+        target_story = next((s for s in stories if s.id == edge['target']), None)
+        
+        if source_story and target_story:
+            return source_story.source != target_story.source
+        return False
+    
+    def _classify_story_topic_enhanced(self, story: EnhancedStory) -> str:
         """Enhanced topic classification for massive datasets"""
         section = story.section.lower()
         title = story.title.lower()
