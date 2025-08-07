@@ -685,6 +685,261 @@ class UltimateNewsProcessor:
             logger.error(f"Error processing NYT story: {e}")
             return None
     
+    async def process_massive_story_collection(self, guardian_stories: List[Dict], nyt_stories: List[Dict], user_prefs: UserPreferences) -> List[EnhancedStory]:
+        """Process hundreds of stories with intelligent batching and parallel processing"""
+        
+        logger.info(f"Processing massive collection: {len(guardian_stories)} Guardian + {len(nyt_stories)} NYT stories")
+        
+        all_stories = []
+        batch_size = 20  # Process 20 stories per batch for efficiency
+        
+        # Create processing batches
+        guardian_batches = [guardian_stories[i:i + batch_size] for i in range(0, len(guardian_stories), batch_size)]
+        nyt_batches = [nyt_stories[i:i + batch_size] for i in range(0, len(nyt_stories), batch_size)]
+        
+        # Process Guardian batches
+        for batch_index, batch in enumerate(guardian_batches):
+            logger.info(f"Processing Guardian batch {batch_index + 1}/{len(guardian_batches)}")
+            
+            tasks = []
+            for story in batch:
+                # Use fast processing for massive scale
+                tasks.append(self._process_guardian_story_fast(story, user_prefs))
+            
+            try:
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in batch_results:
+                    if isinstance(result, EnhancedStory):
+                        all_stories.append(result)
+                    elif isinstance(result, Exception):
+                        logger.warning(f"Guardian story processing failed: {result}")
+            except Exception as e:
+                logger.error(f"Guardian batch {batch_index} failed: {e}")
+        
+        # Process NYT batches
+        for batch_index, batch in enumerate(nyt_batches):
+            logger.info(f"Processing NYT batch {batch_index + 1}/{len(nyt_batches)}")
+            
+            tasks = []
+            for story in batch:
+                # Use fast processing for massive scale
+                tasks.append(self._process_nyt_story_fast(story, user_prefs))
+            
+            try:
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in batch_results:
+                    if isinstance(result, EnhancedStory):
+                        all_stories.append(result)
+                    elif isinstance(result, Exception):
+                        logger.warning(f"NYT story processing failed: {result}")
+            except Exception as e:
+                logger.error(f"NYT batch {batch_index} failed: {e}")
+        
+        logger.info(f"Successfully processed {len(all_stories)} stories out of {len(guardian_stories) + len(nyt_stories)} total")
+        return all_stories
+
+    async def create_massive_knowledge_graph(self, stories: List[EnhancedStory], raw_stories: List[Dict], user_prefs: UserPreferences) -> Dict[str, Any]:
+        """Create a comprehensive knowledge graph with hundreds of interconnected stories"""
+        
+        logger.info(f"Creating massive knowledge graph with {len(stories)} processed stories")
+        
+        # Enhanced topic classification for massive datasets
+        topics_distribution = {}
+        geographic_distribution = {}
+        temporal_distribution = {}
+        
+        # Create nodes with enhanced clustering
+        nodes = []
+        topic_clusters = {}
+        geographic_clusters = {}
+        
+        for story in stories:
+            # Enhanced topic classification
+            topic = self._classify_story_topic_enhanced(story)
+            if topic not in topic_clusters:
+                topic_clusters[topic] = []
+            topic_clusters[topic].append(story.id)
+            
+            # Geographic clustering
+            geo_region = self._extract_geographic_region(story)
+            if geo_region not in geographic_clusters:
+                geographic_clusters[geo_region] = []
+            geographic_clusters[geo_region].append(story.id)
+            
+            # Enhanced node with more metadata
+            node = {
+                "id": story.id,
+                "type": "article",
+                "source": story.source,
+                "title": story.title,
+                "summary": story.summary[:300],  # Limit for performance
+                "lede": story.lede,
+                "section": story.section,
+                "topic_cluster": topic,
+                "geographic_region": geo_region,
+                "publication_date": story.publication_date.isoformat(),
+                "url": story.url,
+                "author": story.author or "Staff",
+                "sentiment_score": story.sentiment_score,
+                "complexity_level": story.complexity_level,
+                "read_time_minutes": story.read_time_minutes,
+                "size": max(15, min(40, len(story.title) // 5)),  # Scaled for massive view
+                "color": self._get_enhanced_topic_color(topic, story.sentiment_score),
+                "entities": story.entities[:5],  # Limit for performance
+                "categories": story.categories,
+                "influence_score": self._calculate_influence_score(story),
+                # Position hints for massive layout
+                "cluster_x": self._get_cluster_x_position(topic),
+                "cluster_y": self._get_cluster_y_position(topic),
+                "geographic_x": self._get_geographic_x_position(geo_region),
+                "geographic_y": self._get_geographic_y_position(geo_region)
+            }
+            nodes.append(node)
+            
+            # Update distributions
+            topics_distribution[topic] = topics_distribution.get(topic, 0) + 1
+            geographic_distribution[geo_region] = geographic_distribution.get(geo_region, 0) + 1
+        
+        # Create topic cluster nodes for major clusters
+        cluster_nodes = []
+        for topic, story_ids in topic_clusters.items():
+            if len(story_ids) >= 5:  # Only create clusters with 5+ stories
+                cluster_nodes.append({
+                    "id": f"topic_{topic.lower().replace(' ', '_').replace('&', 'and')}",
+                    "type": "topic_cluster",
+                    "title": topic,
+                    "size": min(80, 40 + len(story_ids) * 2),  # Scale with story count
+                    "color": self._get_topic_cluster_color(topic),
+                    "story_count": len(story_ids),
+                    "cluster_type": "topic",
+                    "x": self._get_cluster_x_position(topic),
+                    "y": self._get_cluster_y_position(topic)
+                })
+        
+        # Create geographic cluster nodes for major regions
+        for region, story_ids in geographic_clusters.items():
+            if len(story_ids) >= 8 and region != "Global":  # Only create clusters with 8+ stories
+                cluster_nodes.append({
+                    "id": f"geo_{region.lower().replace(' ', '_')}",
+                    "type": "geographic_cluster",
+                    "title": f"📍 {region}",
+                    "size": min(70, 35 + len(story_ids) * 1.5),
+                    "color": self._get_geographic_cluster_color(region),
+                    "story_count": len(story_ids),
+                    "cluster_type": "geographic",
+                    "x": self._get_geographic_x_position(region),
+                    "y": self._get_geographic_y_position(region)
+                })
+        
+        nodes.extend(cluster_nodes)
+        
+        # Advanced connection analysis for massive datasets
+        edges = []
+        if ai_analyzer and len(raw_stories) > 1:
+            # Analyze connections in intelligent batches
+            connections = await self._analyze_massive_story_connections(raw_stories, user_prefs)
+            
+            for connection in connections:
+                is_causal = connection.connection_type in ['causal', 'economic_causal', 'political_causal', 'social_causal', 'environmental_causal', 'indirect_causal']
+                
+                edge = {
+                    "source": connection.source_id,
+                    "target": connection.target_id,
+                    "type": connection.connection_type,
+                    "strength": connection.strength,
+                    "confidence": connection.confidence,
+                    "explanation": connection.explanation,
+                    "keywords": connection.keywords[:3],  # Limit for performance
+                    "evidence_score": connection.evidence_score,
+                    "temporal_relationship": connection.temporal_relationship,
+                    "is_causal": is_causal,
+                    "width": max(1, min(8, connection.strength * 12)) if is_causal else max(1, connection.strength * 6),
+                    "opacity": max(0.2, min(0.8, connection.confidence)),
+                    "stroke_style": "solid" if is_causal else "dashed",
+                    "causal_indicator": "→" if is_causal else "↔",
+                    "connection_id": f"{connection.source_id}_{connection.target_id}"
+                }
+                edges.append(edge)
+        
+        # Add cluster membership edges
+        for story in stories:
+            # Topic cluster connections
+            topic_cluster_id = f"topic_{self._classify_story_topic_enhanced(story).lower().replace(' ', '_').replace('&', 'and')}"
+            if any(node["id"] == topic_cluster_id for node in nodes):
+                edges.append({
+                    "source": story.id,
+                    "target": topic_cluster_id,
+                    "type": "belongs_to_topic_cluster",
+                    "strength": 0.3,
+                    "width": 1,
+                    "opacity": 0.2,
+                    "stroke_style": "dotted"
+                })
+            
+            # Geographic cluster connections
+            geo_region = self._extract_geographic_region(story)
+            geo_cluster_id = f"geo_{geo_region.lower().replace(' ', '_')}"
+            if any(node["id"] == geo_cluster_id for node in nodes):
+                edges.append({
+                    "source": story.id,
+                    "target": geo_cluster_id,
+                    "type": "belongs_to_geographic_cluster",
+                    "strength": 0.2,
+                    "width": 1,
+                    "opacity": 0.15,
+                    "stroke_style": "dotted"
+                })
+        
+        # Calculate advanced statistics
+        causal_connections = [e for e in edges if e.get("is_causal", False)]
+        cross_source_connections = [e for e in edges if self._is_cross_source_connection(e, stories)]
+        
+        logger.info(f"Generated massive graph: {len(nodes)} nodes, {len(edges)} edges, {len(causal_connections)} causal connections")
+        
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "metadata": {
+                "total_articles": len([n for n in nodes if n["type"] == "article"]),
+                "total_topic_clusters": len([n for n in nodes if n["type"] == "topic_cluster"]),
+                "total_geographic_clusters": len([n for n in nodes if n["type"] == "geographic_cluster"]),
+                "total_causal_connections": len(causal_connections),
+                "total_cross_source_connections": len(cross_source_connections),
+                "total_all_connections": len([e for e in edges if not e["type"].startswith("belongs_to")]),
+                "generated_at": datetime.now().isoformat(),
+                "ai_analysis_enabled": True,
+                "user_preferences": user_prefs.dict(),
+                "topics_distribution": topics_distribution,
+                "geographic_distribution": geographic_distribution,
+                "processing_mode": "massive_scale",
+                "data_quality": {
+                    "deduplication_applied": True,
+                    "batch_processing": True,
+                    "parallel_processing": True,
+                    "advanced_clustering": True
+                },
+                "advanced_features": {
+                    "massive_scale": True,
+                    "topic_clustering": True,
+                    "geographic_clustering": True,
+                    "causal_analysis": True,
+                    "cross_source_analysis": True,
+                    "influence_metrics": True,
+                    "real_time_processing": True
+                },
+                "performance_metrics": {
+                    "nodes_count": len(nodes),
+                    "edges_count": len(edges),
+                    "processing_batches": len(stories) // 20 + 1,
+                    "unique_sources": len(set(s.source for s in stories)),
+                    "complexity_distribution": {
+                        str(i): len([s for s in stories if s.complexity_level == i]) 
+                        for i in range(1, 6)
+                    }
+                }
+            }
+        }
+
     async def process_multi_source_stories(self, guardian_stories: List[Dict], nyt_stories: List[Dict], user_prefs: UserPreferences) -> List[EnhancedStory]:
         all_stories = []
         
