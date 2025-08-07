@@ -1799,13 +1799,13 @@ async def get_ultimate_knowledge_graph(
         guardian_stories = [s for s in raw_stories if 'webTitle' in s]
         nyt_stories = [s for s in raw_stories if 'headline' in s]
         
-        # Use existing processing methods with larger batches
-        processed_stories = await news_processor.process_multi_source_stories(
+        # Use massive processing methods for larger batches
+        processed_stories = await news_processor.process_massive_story_collection(
             guardian_stories, nyt_stories, user_prefs
         )
         
-        # Create comprehensive knowledge graph with existing method
-        knowledge_graph = await news_processor.create_ultimate_knowledge_graph(
+        # Create comprehensive knowledge graph with massive method
+        knowledge_graph = await news_processor.create_massive_knowledge_graph(
             processed_stories, raw_stories, user_prefs
         )
         
