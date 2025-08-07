@@ -1228,17 +1228,17 @@ async def track_analytics_v3(analytics_data: AnalyticsData):
 @app.get("/api/v4/knowledge-graph/ultimate")
 async def get_ultimate_knowledge_graph(
     background_tasks: BackgroundTasks,
-    days: int = Query(default=3, ge=1, le=14),
+    days: int = Query(default=7, ge=1, le=30),  # Extended range
     sources: str = Query(default="guardian,nyt"),
     section: Optional[str] = Query(default=None),
     complexity_level: int = Query(default=3, ge=1, le=5),
     geographic_focus: Optional[str] = Query(default=None),
-    max_articles: int = Query(default=12, ge=5, le=20),  # Reduced from 25 to 12
+    max_articles: int = Query(default=300, ge=50, le=500),  # MASSIVELY INCREASED
     session_id: str = Query(default_factory=lambda: str(uuid.uuid4()))
 ):
-    """Optimized knowledge graph with faster processing"""
+    """Massive knowledge graph with hundreds of interconnected stories"""
     
-    cache_key = f"fast_graph:{days}:{sources}:{section}:{complexity_level}:{max_articles}"
+    cache_key = f"massive_graph:{days}:{sources}:{section}:{complexity_level}:{max_articles}"
     
     cached_result = await news_processor.get_cached_result(cache_key)
     if cached_result:
@@ -1246,8 +1246,8 @@ async def get_ultimate_knowledge_graph(
             analytics_manager.track_event,
             AnalyticsData(
                 session_id=session_id,
-                action="view_cached_fast_graph",
-                metadata={"cache_hit": True, "sources": sources}
+                action="view_cached_massive_graph",
+                metadata={"cache_hit": True, "sources": sources, "article_count": max_articles}
             )
         )
         return cached_result
@@ -1261,92 +1261,103 @@ async def get_ultimate_knowledge_graph(
         to_date = datetime.now().strftime('%Y-%m-%d')
         from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
         
-        # Faster multi-source data fetching with timeouts
+        # MASSIVE multi-source data fetching with batch processing
         source_list = sources.split(',')
+        
+        # Batch API calls for hundreds of stories
+        all_stories = []
+        batch_size = 50
+        
         async with MultiSourceNewsClient() as client:
-            tasks = {}
+            tasks = []
             
             if 'guardian' in source_list:
-                tasks['guardian'] = asyncio.wait_for(
-                    client.search_guardian(
-                        section=section,
-                        from_date=from_date,
-                        to_date=to_date,
-                        page_size=max_articles//2
-                    ), timeout=10.0  # 10 second timeout
-                )
+                # Multiple batches for Guardian
+                for page in range(1, (max_articles // batch_size) + 1):
+                    tasks.append(asyncio.wait_for(
+                        client.search_guardian(
+                            section=section,
+                            from_date=from_date,
+                            to_date=to_date,
+                            page_size=batch_size,
+                            page=page
+                        ), timeout=15.0
+                    ))
             
             if 'nyt' in source_list:
-                tasks['nyt'] = asyncio.wait_for(
-                    client.search_nyt(
-                        section=section,
-                        from_date=from_date,
-                        to_date=to_date,
-                        page_size=max_articles//2
-                    ), timeout=10.0  # 10 second timeout
-                )
+                # Multiple batches for NYT
+                for page in range(0, (max_articles // batch_size)):
+                    tasks.append(asyncio.wait_for(
+                        client.search_nyt(
+                            section=section,
+                            from_date=from_date,
+                            to_date=to_date,
+                            page_size=batch_size,
+                            page=page
+                        ), timeout=15.0
+                    ))
             
-            # Run API calls in parallel for speed
-            source_results = {}
-            for source, task in tasks.items():
+            # Execute all batch requests in parallel
+            batch_results = []
+            for i in range(0, len(tasks), 5):  # Process 5 batches at a time
+                batch = tasks[i:i+5]
                 try:
-                    source_results[source] = await task
-                except asyncio.TimeoutError:
-                    logger.warning(f"{source} API timeout, using fallback")
-                    source_results[source] = []
+                    results = await asyncio.gather(*batch, return_exceptions=True)
+                    for result in results:
+                        if isinstance(result, list):
+                            batch_results.extend(result)
+                        elif isinstance(result, Exception):
+                            logger.warning(f"Batch request failed: {result}")
                 except Exception as e:
-                    logger.error(f"{source} API error: {e}")
-                    source_results[source] = []
+                    logger.error(f"Batch processing error: {e}")
         
-        raw_stories = []
-        guardian_stories = source_results.get('guardian', [])
-        nyt_stories = source_results.get('nyt', [])
+        # Deduplicate stories by URL and title
+        unique_stories = {}
+        for story in batch_results:
+            story_url = story.get('webUrl') or story.get('web_url', '')
+            story_title = story.get('webTitle') or story.get('headline', {}).get('main', '')
+            
+            key = f"{story_url}_{story_title}"
+            if key not in unique_stories and story_url and story_title:
+                unique_stories[key] = story
         
-        raw_stories.extend(guardian_stories)
-        raw_stories.extend(nyt_stories)
+        raw_stories = list(unique_stories.values())[:max_articles]
         
-        # Limit total stories for faster processing
-        raw_stories = raw_stories[:max_articles]
+        logger.info(f"Fetched {len(raw_stories)} unique stories for massive graph")
         
-        if not raw_stories:
-            logger.info("No stories found, using demo data")
+        if len(raw_stories) < 10:
+            logger.info("Insufficient stories found, using demo data")
             return await get_ultimate_demo_graph()
         
-        # Fast processing with parallel story analysis
-        processed_stories = await news_processor.process_multi_source_stories_fast(
-            guardian_stories[:max_articles//2], 
-            nyt_stories[:max_articles//2], 
-            user_prefs
+        # Process stories in large batches
+        guardian_stories = [s for s in raw_stories if 'webTitle' in s]
+        nyt_stories = [s for s in raw_stories if 'headline' in s]
+        
+        # Use existing processing methods with larger batches
+        processed_stories = await news_processor.process_multi_source_stories(
+            guardian_stories, nyt_stories, user_prefs
         )
         
-        # Fallback to regular processing if fast fails
-        if not processed_stories:
-            logger.info("Fast processing failed, using regular processing")
-            processed_stories = await news_processor.process_multi_source_stories(
-                guardian_stories[:6], 
-                nyt_stories[:6], 
-                user_prefs
-            )
-        
-        # Create optimized knowledge graph
+        # Create comprehensive knowledge graph with existing method
         knowledge_graph = await news_processor.create_ultimate_knowledge_graph(
             processed_stories, raw_stories, user_prefs
         )
         
-        # Cache result for 15 minutes (shorter cache for faster updates)
+        # Enhanced caching for large datasets
         await news_processor.set_cached_result(cache_key, knowledge_graph)
         
-        # Track analytics
+        # Track massive analytics
         background_tasks.add_task(
             analytics_manager.track_event,
             AnalyticsData(
                 session_id=session_id,
-                action="generate_fast_graph",
+                action="generate_massive_graph",
                 metadata={
                     "sources_used": source_list,
                     "total_stories": len(processed_stories),
                     "complexity_level": complexity_level,
-                    "processing_time": "optimized",
+                    "processing_mode": "massive_scale",
+                    "unique_topics": len(set(s.section for s in processed_stories)),
                     "cache_miss": True
                 }
             )
@@ -1355,8 +1366,7 @@ async def get_ultimate_knowledge_graph(
         return knowledge_graph
         
     except Exception as e:
-        logger.error(f"Fast knowledge graph error: {e}")
-        # Quick fallback to demo
+        logger.error(f"Massive knowledge graph error: {e}")
         return await get_ultimate_demo_graph()
 
 @app.get("/api/v4/demo/ultimate")
