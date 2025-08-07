@@ -2178,7 +2178,7 @@ async def get_enhanced_massive_demo_graph() -> Dict[str, Any]:
             "complexity_level": 3,
             "read_time_minutes": 4,
             "size": max(15, min(30, len(story["title"]) // 6)),  # Smaller for massive view
-            "color": news_processor._get_enhanced_topic_color(topic),
+            "color": news_processor._get_topic_color(topic),
             "entities": ["Entity1", "Entity2"],
             "categories": [topic],
             "influence_score": 0.7
