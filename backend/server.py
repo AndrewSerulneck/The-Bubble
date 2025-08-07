@@ -2024,6 +2024,352 @@ async def get_ultimate_knowledge_graph(
         logger.error(f"Massive knowledge graph error: {e}")
         return await get_ultimate_demo_graph()
 
+async def get_enhanced_massive_demo_graph() -> Dict[str, Any]:
+    """Enhanced massive demo graph with hundreds of interconnected stories"""
+    
+    # Generate a large demo dataset with diverse stories
+    demo_stories = [
+        # Business & Economy cluster (15 stories)
+        {"id": "biz1", "title": "Federal Reserve Raises Interest Rates Amid Inflation Concerns", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz2", "title": "Oil Prices Surge Following Middle East Supply Disruptions", "topic": "Business & Economy", "region": "Middle East"},
+        {"id": "biz3", "title": "Tech Giants Report Record Quarterly Earnings Despite Market Volatility", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz4", "title": "European Central Bank Maintains Aggressive Monetary Policy Stance", "topic": "Business & Economy", "region": "Europe"},
+        {"id": "biz5", "title": "Cryptocurrency Market Experiences Significant Volatility Following Regulatory News", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz6", "title": "Global Supply Chain Disruptions Impact Manufacturing Sector", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz7", "title": "Banking Sector Consolidation Accelerates with Major Merger Announcement", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz8", "title": "Commodity Prices Fluctuate on Geopolitical Uncertainty", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz9", "title": "Retail Sales Show Mixed Signals Amid Consumer Spending Changes", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz10", "title": "Energy Companies Pivot to Renewable Investment Strategies", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz11", "title": "Trade War Tensions Impact Global Economic Growth Projections", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz12", "title": "Housing Market Shows Resilience Despite Interest Rate Hikes", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz13", "title": "Insurance Industry Adapts to Climate Risk Assessment Models", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz14", "title": "Pharmaceutical Mergers Create New Market Dynamics", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz15", "title": "Labor Market Tightness Drives Wage Growth Across Industries", "topic": "Business & Economy", "region": "Global"},
+        
+        # Politics & Government cluster (15 stories)
+        {"id": "pol1", "title": "Congressional Leaders Reach Bipartisan Agreement on Infrastructure Spending", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol2", "title": "European Union Announces New Sanctions Package Against Authoritarian Regimes", "topic": "Politics & Government", "region": "Europe"},
+        {"id": "pol3", "title": "Presidential Campaign Intensifies with Major Policy Announcements", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol4", "title": "International Trade Negotiations Face New Challenges Amid Geopolitical Tensions", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol5", "title": "Supreme Court Decision on Environmental Regulations Sparks National Debate", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol6", "title": "Municipal Elections Show Shifting Political Landscape in Major Cities", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol7", "title": "Immigration Policy Reform Gains Momentum in Legislative Sessions", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol8", "title": "International Climate Summit Produces Ambitious New Commitments", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol9", "title": "Judicial Nominations Spark Constitutional Debates", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol10", "title": "Regional Trade Bloc Negotiations Enter Critical Phase", "topic": "Politics & Government", "region": "Asia Pacific"},
+        {"id": "pol11", "title": "Electoral Reform Initiatives Gain Traction Across Multiple States", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol12", "title": "Diplomatic Relations Strengthen Through Cultural Exchange Programs", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol13", "title": "Budget Negotiations Reveal Partisan Differences on Spending Priorities", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol14", "title": "International Peacekeeping Mission Receives Enhanced Mandate", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol15", "title": "Administrative Reform Package Aims to Modernize Government Services", "topic": "Politics & Government", "region": "Global"},
+        
+        # Technology cluster (20 stories)
+        {"id": "tech1", "title": "Artificial Intelligence Breakthrough Promises Revolutionary Healthcare Applications", "topic": "Technology", "region": "North America"},
+        {"id": "tech2", "title": "Major Social Media Platform Announces Comprehensive Privacy Policy Overhaul", "topic": "Technology", "region": "Global"},
+        {"id": "tech3", "title": "Quantum Computing Milestone Achieved by Leading Research Institution", "topic": "Technology", "region": "Asia Pacific"},
+        {"id": "tech4", "title": "Cybersecurity Experts Warn of Sophisticated New Ransomware Threat", "topic": "Technology", "region": "Global"},
+        {"id": "tech5", "title": "Electric Vehicle Market Expansion Accelerates with New Battery Technology", "topic": "Technology", "region": "Global"},
+        {"id": "tech6", "title": "5G Network Rollout Reaches Critical Infrastructure Milestone", "topic": "Technology", "region": "Global"},
+        {"id": "tech7", "title": "Autonomous Vehicle Testing Expands to Urban Environments", "topic": "Technology", "region": "North America"},
+        {"id": "tech8", "title": "Blockchain Technology Adoption Grows in Financial Services", "topic": "Technology", "region": "Global"},
+        {"id": "tech9", "title": "Virtual Reality Applications Transform Educational Experiences", "topic": "Technology", "region": "Global"},
+        {"id": "tech10", "title": "Cloud Computing Infrastructure Investment Reaches Record Levels", "topic": "Technology", "region": "Global"},
+        {"id": "tech11", "title": "Internet of Things Security Standards Updated for Industrial Applications", "topic": "Technology", "region": "Global"},
+        {"id": "tech12", "title": "Machine Learning Algorithms Improve Weather Prediction Accuracy", "topic": "Technology", "region": "Global"},
+        {"id": "tech13", "title": "Semiconductor Shortage Continues to Impact Global Supply Chains", "topic": "Technology", "region": "Global"},
+        {"id": "tech14", "title": "Space Technology Companies Launch New Satellite Constellations", "topic": "Technology", "region": "Global"},
+        {"id": "tech15", "title": "Robotics Innovation Transforms Manufacturing Processes", "topic": "Technology", "region": "Asia Pacific"},
+        {"id": "tech16", "title": "Digital Currency Pilot Programs Launch in Major Economies", "topic": "Technology", "region": "Global"},
+        {"id": "tech17", "title": "Augmented Reality Shopping Experiences Gain Consumer Adoption", "topic": "Technology", "region": "Global"},
+        {"id": "tech18", "title": "Biotech Companies Utilize AI for Drug Discovery Acceleration", "topic": "Technology", "region": "North America"},
+        {"id": "tech19", "title": "Smart City Initiatives Integrate Multiple Technology Platforms", "topic": "Technology", "region": "Global"},
+        {"id": "tech20", "title": "Edge Computing Solutions Address Data Processing Challenges", "topic": "Technology", "region": "Global"}
+    ]
+    
+    # Add more diverse stories across all categories (continuing the pattern)
+    additional_stories = [
+        # Environment & Climate (12 stories)
+        {"id": "env1", "title": "Climate Scientists Report Accelerating Ice Sheet Loss in Antarctica", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env2", "title": "Renewable Energy Investment Reaches Historic Highs Across Developing Nations", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env3", "title": "Major Corporation Commits to Net-Zero Carbon Emissions by 2030", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env4", "title": "Extreme Weather Events Increase Pressure for Climate Action", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env5", "title": "International Carbon Trading Market Undergoes Significant Reform", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env6", "title": "Ocean Conservation Initiative Expands Marine Protected Areas", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env7", "title": "Solar Panel Efficiency Breakthrough Accelerates Clean Energy Adoption", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env8", "title": "Deforestation Rates Decline Following International Cooperation Efforts", "topic": "Environment & Climate", "region": "Latin America"},
+        {"id": "env9", "title": "Green Building Standards Updated to Address Climate Resilience", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env10", "title": "Electric Grid Modernization Supports Renewable Energy Integration", "topic": "Environment & Climate", "region": "North America"},
+        {"id": "env11", "title": "Biodiversity Protection Measures Gain Legislative Support", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env12", "title": "Clean Water Access Projects Expand in Developing Regions", "topic": "Environment & Climate", "region": "Africa"},
+        
+        # Health & Medicine (12 stories)
+        {"id": "health1", "title": "Medical Researchers Announce Breakthrough in Alzheimer's Disease Treatment", "topic": "Health & Medicine", "region": "North America"},
+        {"id": "health2", "title": "Global Health Organization Reports Progress in Malaria Eradication Efforts", "topic": "Health & Medicine", "region": "Africa"},
+        {"id": "health3", "title": "Mental Health Services Experience Unprecedented Demand Post-Pandemic", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health4", "title": "Pharmaceutical Companies Collaborate on Rare Disease Drug Development", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health5", "title": "Telemedicine Adoption Transforms Healthcare Delivery in Rural Communities", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health6", "title": "Gene Therapy Trials Show Promise for Inherited Disorders", "topic": "Health & Medicine", "region": "Europe"},
+        {"id": "health7", "title": "Precision Medicine Approaches Personalize Cancer Treatment", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health8", "title": "Public Health Initiatives Target Preventive Care Expansion", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health9", "title": "Medical Device Innovation Improves Patient Monitoring Capabilities", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health10", "title": "Healthcare Workforce Shortages Drive Training Program Expansion", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health11", "title": "Digital Therapeutics Gain Regulatory Approval for Mental Health", "topic": "Health & Medicine", "region": "North America"},
+        {"id": "health12", "title": "Vaccine Development Pipeline Addresses Emerging Infectious Diseases", "topic": "Health & Medicine", "region": "Global"},
+        
+        # Additional categories (Sports, Culture, Education, etc.)
+        {"id": "sport1", "title": "Olympic Games Preparation Emphasizes Athlete Mental Health Support", "topic": "Sports", "region": "Global"},
+        {"id": "sport2", "title": "Professional Sports League Implements Revolutionary Sustainability Initiative", "topic": "Sports", "region": "North America"},
+        {"id": "sport3", "title": "World Cup Tournament Showcases Emerging Football Talent from Developing Nations", "topic": "Sports", "region": "Global"},
+        {"id": "sport4", "title": "Tennis Championship Features Record-Breaking Prize Money Distribution", "topic": "Sports", "region": "Europe"},
+        {"id": "sport5", "title": "Basketball League Expands International Presence with New Franchise", "topic": "Sports", "region": "Asia Pacific"},
+        
+        {"id": "culture1", "title": "Major Art Museum Opens Groundbreaking Exhibition on Digital Art", "topic": "Culture & Arts", "region": "Europe"},
+        {"id": "culture2", "title": "Film Industry Grapples with Changing Distribution Models in Streaming Era", "topic": "Culture & Arts", "region": "North America"},
+        {"id": "culture3", "title": "Music Festival Returns with Focus on Sustainability and Local Artists", "topic": "Culture & Arts", "region": "Europe"},
+        {"id": "culture4", "title": "Archaeological Discovery Reveals Ancient Civilization's Advanced Technology", "topic": "Culture & Arts", "region": "Middle East"},
+        {"id": "culture5", "title": "Literary Award Winners Reflect Diverse Voices in Contemporary Fiction", "topic": "Culture & Arts", "region": "Global"},
+        
+        {"id": "edu1", "title": "Universities Implement AI-Powered Personalized Learning Systems", "topic": "Education", "region": "North America"},
+        {"id": "edu2", "title": "Global Education Initiative Addresses Digital Divide in Remote Areas", "topic": "Education", "region": "Global"},
+        {"id": "edu3", "title": "STEM Education Programs Expand to Underserved Communities", "topic": "Education", "region": "Global"},
+        {"id": "edu4", "title": "Online Learning Platforms Transform Adult Education Opportunities", "topic": "Education", "region": "Global"},
+        
+        {"id": "security1", "title": "International Peacekeeping Forces Deploy to Address Regional Conflict", "topic": "Security & Conflict", "region": "Africa"},
+        {"id": "security2", "title": "Cybersecurity Alliance Forms to Combat State-Sponsored Hacking", "topic": "Security & Conflict", "region": "Global"},
+        {"id": "security3", "title": "Defense Ministry Announces Strategic Military Technology Investment", "topic": "Security & Conflict", "region": "Asia Pacific"},
+        {"id": "security4", "title": "Border Security Enhancement Program Receives Bipartisan Legislative Support", "topic": "Security & Conflict", "region": "North America"}
+    ]
+    
+    # Combine all demo stories
+    all_demo_stories = demo_stories + additional_stories
+    
+    # Create nodes with enhanced properties
+    nodes = []
+    topic_clusters = {}
+    geographic_clusters = {}
+    
+    for story in all_demo_stories:
+        topic = story["topic"]
+        region = story["region"]
+        
+        # Track clusters
+        if topic not in topic_clusters:
+            topic_clusters[topic] = []
+        topic_clusters[topic].append(story["id"])
+        
+        if region not in geographic_clusters:
+            geographic_clusters[region] = []
+        geographic_clusters[region].append(story["id"])
+        
+        # Create article node
+        node = {
+            "id": story["id"],
+            "type": "article",
+            "source": "guardian" if story["id"].endswith(('1', '3', '5', '7', '9')) else "nyt",
+            "title": story["title"],
+            "summary": f"Comprehensive analysis of {story['title'].lower()} with detailed insights and implications.",
+            "section": topic.split(' & ')[0].lower(),
+            "topic_cluster": topic,
+            "geographic_region": region,
+            "publication_date": datetime.now().isoformat(),
+            "url": f"https://example.com/article/{story['id']}",
+            "author": "Staff Reporter",
+            "sentiment_score": 0.1,
+            "complexity_level": 3,
+            "read_time_minutes": 4,
+            "size": max(15, min(30, len(story["title"]) // 6)),  # Smaller for massive view
+            "color": news_processor._get_enhanced_topic_color(topic),
+            "entities": ["Entity1", "Entity2"],
+            "categories": [topic],
+            "influence_score": 0.7
+        }
+        nodes.append(node)
+    
+    # Create topic cluster nodes
+    for topic, story_ids in topic_clusters.items():
+        if len(story_ids) >= 3:  # Create clusters with 3+ stories
+            nodes.append({
+                "id": f"topic_{topic.lower().replace(' ', '_').replace('&', 'and')}",
+                "type": "topic_cluster",
+                "title": topic,
+                "size": min(50, 25 + len(story_ids) * 2),
+                "color": news_processor._get_topic_cluster_color(topic),
+                "story_count": len(story_ids),
+                "cluster_type": "topic"
+            })
+    
+    # Create geographic cluster nodes  
+    for region, story_ids in geographic_clusters.items():
+        if len(story_ids) >= 5 and region != "Global":
+            nodes.append({
+                "id": f"geo_{region.lower().replace(' ', '_')}",
+                "type": "geographic_cluster", 
+                "title": f"📍 {region}",
+                "size": min(40, 20 + len(story_ids) * 1.5),
+                "color": news_processor._get_geographic_cluster_color(region),
+                "story_count": len(story_ids),
+                "cluster_type": "geographic"
+            })
+    
+    # Create comprehensive causal connections for massive interconnected web
+    edges = []
+    
+    # Major causal chains across the entire ecosystem
+    comprehensive_connections = [
+        # Economic causality mega-chain
+        ("biz2", "biz1", "economic_causal", 0.9, "Oil price surge drives inflation, prompting Fed rate response"),
+        ("biz1", "biz12", "economic_causal", 0.8, "Interest rate hikes impact housing market dynamics"),
+        ("biz1", "biz9", "economic_causal", 0.7, "Federal policy changes affect consumer spending patterns"),
+        ("biz3", "tech5", "economic_causal", 0.8, "Tech earnings influence electric vehicle market investment"),
+        ("biz6", "tech13", "economic_causal", 0.9, "Supply chain disruptions directly impact semiconductor availability"),
+        ("biz10", "env2", "economic_causal", 0.8, "Energy company pivots drive renewable investment growth"),
+        
+        # Political and policy interconnections
+        ("pol1", "biz1", "political_causal", 0.8, "Infrastructure spending influences monetary policy decisions"),
+        ("pol5", "env3", "political_causal", 0.9, "Supreme Court ruling drives corporate environmental commitments"),
+        ("pol8", "env5", "political_causal", 0.9, "Climate summit directly creates carbon trading reform"),
+        ("pol2", "security2", "political_causal", 0.7, "EU sanctions increase cybersecurity cooperation needs"),
+        ("pol4", "biz11", "political_causal", 0.8, "Trade negotiations directly impact economic growth projections"),
+        
+        # Technology revolution cascade
+        ("tech1", "health1", "causal", 0.9, "AI breakthroughs enable Alzheimer's treatment development"),
+        ("tech1", "health7", "causal", 0.8, "AI advances power precision medicine approaches"),
+        ("tech3", "tech14", "causal", 0.8, "Quantum computing breakthrough enables space technology advances"),
+        ("tech4", "security2", "causal", 0.8, "Ransomware threats drive international cybersecurity cooperation"),
+        ("tech5", "env10", "causal", 0.8, "Electric vehicle growth necessitates grid modernization"),
+        ("tech6", "tech19", "causal", 0.7, "5G rollout enables comprehensive smart city development"),
+        ("tech8", "tech16", "causal", 0.8, "Blockchain adoption facilitates digital currency programs"),
+        
+        # Environmental and climate web
+        ("env1", "env4", "environmental_causal", 0.9, "Antarctic ice loss directly increases extreme weather"),
+        ("env4", "biz2", "environmental_causal", 0.7, "Extreme weather disrupts oil supply chains"),
+        ("env4", "biz13", "environmental_causal", 0.8, "Climate events drive insurance industry adaptation"),
+        ("env2", "tech7", "environmental_causal", 0.7, "Renewable investment accelerates clean technology"),
+        ("env3", "biz10", "environmental_causal", 0.8, "Corporate net-zero commitments influence energy sector"),
+        
+        # Health and society connections
+        ("health3", "tech1", "social_causal", 0.7, "Mental health demand drives AI healthcare development"),
+        ("health3", "health11", "social_causal", 0.8, "Mental health needs accelerate digital therapeutics"),
+        ("health1", "tech18", "causal", 0.9, "Alzheimer's breakthrough showcases AI drug discovery"),
+        ("health5", "tech1", "causal", 0.8, "Telemedicine expansion drives AI healthcare applications"),
+        ("health12", "tech1", "causal", 0.7, "Vaccine development benefits from AI research capabilities"),
+        
+        # Cross-sector innovation chains
+        ("edu1", "tech1", "causal", 0.8, "AI education systems build on healthcare AI research"),
+        ("edu2", "tech6", "causal", 0.7, "Digital divide initiatives rely on 5G infrastructure"),
+        ("sport1", "health3", "social_causal", 0.7, "Olympic mental health focus reflects broader healthcare trends"),
+        ("culture2", "tech2", "economic_causal", 0.6, "Streaming changes influence social media policies"),
+        
+        # Security and technology interconnections
+        ("security1", "pol14", "political_causal", 0.8, "Peacekeeping deployment leads to enhanced mandate"),
+        ("security2", "tech4", "causal", 0.9, "Cybersecurity alliance formed in response to ransomware"),
+        ("security3", "tech14", "causal", 0.7, "Military tech investment supports space technology"),
+        
+        # Additional interconnected web (second-order effects)
+        ("tech9", "edu3", "causal", 0.7, "VR education transforms STEM program delivery"),
+        ("tech12", "env4", "causal", 0.8, "Improved weather prediction helps climate adaptation"),
+        ("tech15", "biz6", "causal", 0.8, "Manufacturing robotics addresses supply chain issues"),
+        ("tech17", "biz9", "economic_causal", 0.6, "AR shopping experiences change retail dynamics"),
+        ("tech19", "env9", "causal", 0.7, "Smart cities implement green building standards"),
+        
+        # Complex multi-hop causality chains
+        ("env6", "health2", "environmental_causal", 0.6, "Ocean conservation supports global health initiatives"),
+        ("env8", "env12", "environmental_causal", 0.7, "Deforestation reduction helps water access projects"),
+        ("health6", "health4", "causal", 0.8, "Gene therapy advances support rare disease collaboration"),
+        ("health8", "health10", "social_causal", 0.8, "Preventive care expansion addresses workforce shortages"),
+        
+        # Cultural and social ripples
+        ("culture1", "tech9", "social_causal", 0.6, "Digital art exhibitions inspire VR applications"),
+        ("culture3", "env3", "social_causal", 0.6, "Sustainable festivals influence corporate commitments"),
+        ("culture4", "edu3", "social_causal", 0.5, "Archaeological discoveries enhance STEM education"),
+        ("culture5", "edu2", "social_causal", 0.5, "Diverse literature supports global education"),
+        
+        # Education and workforce development
+        ("edu4", "health10", "social_causal", 0.7, "Online learning addresses healthcare training needs"),
+        ("edu1", "edu4", "causal", 0.8, "AI university systems inform adult education platforms")
+    ]
+    
+    # Create edges from all connections
+    for source, target, conn_type, strength, explanation in comprehensive_connections:
+        edges.append({
+            "source": source,
+            "target": target,
+            "type": conn_type,
+            "strength": strength,
+            "confidence": strength,
+            "explanation": explanation,
+            "keywords": ["demo", "causality", "interconnected"],
+            "evidence_score": strength,
+            "temporal_relationship": "concurrent",
+            "is_causal": True,
+            "width": max(1, min(6, strength * 8)),  # Thinner lines for massive view
+            "opacity": max(0.3, strength * 0.7),
+            "stroke_style": "solid",
+            "causal_indicator": "→"
+        })
+    
+    # Add cluster membership edges
+    for story in all_demo_stories:
+        topic_cluster_id = f"topic_{story['topic'].lower().replace(' ', '_').replace('&', 'and')}"
+        if any(node["id"] == topic_cluster_id for node in nodes):
+            edges.append({
+                "source": story["id"],
+                "target": topic_cluster_id,
+                "type": "belongs_to_topic_cluster",
+                "strength": 0.2,
+                "width": 1,
+                "opacity": 0.1,
+                "stroke_style": "dotted"
+            })
+        
+        region = story["region"]
+        geo_cluster_id = f"geo_{region.lower().replace(' ', '_')}"
+        if any(node["id"] == geo_cluster_id for node in nodes):
+            edges.append({
+                "source": story["id"], 
+                "target": geo_cluster_id,
+                "type": "belongs_to_geographic_cluster",
+                "strength": 0.15,
+                "width": 1,
+                "opacity": 0.08,
+                "stroke_style": "dotted"
+            })
+    
+    logger.info(f"Generated massive demo graph: {len(nodes)} nodes, {len(edges)} edges")
+    
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "metadata": {
+            "total_articles": len([n for n in nodes if n["type"] == "article"]),
+            "total_topic_clusters": len([n for n in nodes if n["type"] == "topic_cluster"]),
+            "total_geographic_clusters": len([n for n in nodes if n["type"] == "geographic_cluster"]),
+            "total_causal_connections": len([e for e in edges if e.get("is_causal", False)]),
+            "total_all_connections": len([e for e in edges if not e["type"].startswith("belongs_to")]),
+            "generated_at": datetime.now().isoformat(),
+            "demo_mode": True,
+            "processing_mode": "massive_demo",
+            "topics_distribution": {topic: len(story_ids) for topic, story_ids in topic_clusters.items()},
+            "geographic_distribution": {region: len(story_ids) for region, story_ids in geographic_clusters.items()},
+            "advanced_features": {
+                "massive_scale": True,
+                "comprehensive_interconnections": True,
+                "topic_clustering": True,
+                "geographic_clustering": True,
+                "causal_analysis": True,
+                "cross_source_analysis": True,
+                "multi_hop_causality": True
+            },
+            "scale_metrics": {
+                "stories_count": len(all_demo_stories),
+                "connections_count": len(comprehensive_connections),
+                "topic_categories": len(topic_clusters),
+                "geographic_regions": len(geographic_clusters),
+                "causality_chains": "multi_level"
+            }
+        }
+    }
+
 @app.get("/api/v4/demo/ultimate")
 async def get_ultimate_demo_graph():
     """Ultimate demo with comprehensive features showcase"""
