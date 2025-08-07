@@ -1279,6 +1279,23 @@ class UltimateNewsProcessor:
         
         return base_color
     
+    def _get_simple_topic_color(self, topic: str) -> str:
+        """Get simple color for topic without sentiment modification"""
+        base_colors = {
+            'Business & Economy': '#f39c12',
+            'Politics & Government': '#3498db', 
+            'Fashion & Style': '#e91e63',
+            'Culture & Arts': '#9c27b0',
+            'Restaurants & Food': '#ff5722',
+            'Technology': '#673ab7',
+            'Environment & Climate': '#4caf50',
+            'Health & Medicine': '#00bcd4',
+            'Sports': '#8bc34a',
+            'Security & Conflict': '#f44336',
+            'General News': '#607d8b'
+        }
+        return base_colors.get(topic, '#95a5a6')
+    
     def _get_topic_cluster_color(self, topic: str) -> str:
         """Get darker cluster color for topic group nodes"""
         colors = {
