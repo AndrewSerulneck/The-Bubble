@@ -231,40 +231,78 @@ const App = () => {
 
     if (!data.nodes || data.nodes.length === 0) return;
 
-    const width = 1400;
-    const height = 800;
+    // Massive scale canvas - larger for hundreds of bubbles
+    const width = 2000;  // Increased for massive scale
+    const height = 1200; // Increased for massive scale
     
     svg.attr('width', width).attr('height', height);
 
-    // Filter article nodes for rendering
+    // Filter nodes for massive scale rendering
     const articleNodes = data.nodes.filter(d => d.type === 'article');
-    const clusterNodes = data.nodes.filter(d => d.type === 'topic_cluster');
+    const clusterNodes = data.nodes.filter(d => d.type === 'topic_cluster' || d.type === 'geographic_cluster');
     
-    console.log(`Rendering ${articleNodes.length} article nodes and ${clusterNodes.length} cluster nodes`);
+    console.log(`🚀 MASSIVE SCALE: Rendering ${articleNodes.length} articles, ${clusterNodes.length} clusters, ${data.edges.length} connections`);
 
-    // Simplified force simulation
+    // Optimized force simulation for massive datasets
     const simulation = d3.forceSimulation(data.nodes)
-      .force('link', d3.forceLink(data.edges).id(d => d.id).distance(120).strength(0.6))
-      .force('charge', d3.forceManyBody().strength(-400))
+      .force('link', d3.forceLink(data.edges)
+        .id(d => d.id)
+        .distance(d => {
+          if (d.type && d.type.includes('belongs_to')) return 60;  // Cluster membership
+          return 100 + (1 - (d.strength || 0.5)) * 80;  // Adaptive distance based on connection strength
+        })
+        .strength(d => {
+          if (d.type && d.type.includes('belongs_to')) return 0.1;
+          return (d.confidence || 0.5) * 0.4;  // Strength based on confidence
+        })
+      )
+      .force('charge', d3.forceManyBody()
+        .strength(d => {
+          if (d.type === 'article') return -300;  // Reduced for performance
+          if (d.type === 'topic_cluster') return -500;
+          if (d.type === 'geographic_cluster') return -400;
+          return -200;
+        })
+      )
       .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(d => (d.size || 25) + 8));
+      .force('collision', d3.forceCollide()
+        .radius(d => (d.size || 20) + 5)
+      )
+      // Topic clustering forces for organization
+      .force('x', d3.forceX(d => {
+        if (d.type === 'article' && d.cluster_x) {
+          return d.cluster_x * width;
+        }
+        return width / 2;
+      }).strength(0.05))  // Gentle clustering
+      .force('y', d3.forceY(d => {
+        if (d.type === 'article' && d.cluster_y) {
+          return d.cluster_y * height;
+        }
+        return height / 2;
+      }).strength(0.05));
 
     const container = svg.append('g');
+    
+    // Enhanced zoom for massive scale
     const zoom = d3.zoom()
-      .scaleExtent([0.5, 3])
+      .scaleExtent([0.1, 4])  // Allow zooming out more for massive view
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
       });
     
     svg.call(zoom);
 
-    // Links
-    const links = container.selectAll('.link')
+    // Efficient edge rendering for massive datasets
+    const linkGroup = container.append('g').attr('class', 'links');
+    const links = linkGroup.selectAll('.link')
       .data(data.edges)
       .enter()
       .append('line')
       .attr('class', 'link')
       .style('stroke', d => {
+        if (d.type && d.type.includes('belongs_to')) return '#e0e0e0';
+        
         const causalColors = {
           'causal': '#e74c3c',
           'economic_causal': '#f39c12',
@@ -275,140 +313,144 @@ const App = () => {
         };
         return causalColors[d.type] || '#95a5a6';
       })
-      .style('stroke-width', d => Math.min(8, d.width || 2))
-      .style('stroke-opacity', 0.6);
+      .style('stroke-width', d => {
+        if (d.type && d.type.includes('belongs_to')) return 1;
+        return Math.max(1, Math.min(4, (d.width || 2)));  // Capped for performance
+      })
+      .style('stroke-opacity', d => {
+        if (d.type && d.type.includes('belongs_to')) return 0.1;
+        return Math.max(0.2, Math.min(0.8, d.opacity || 0.6));
+      })
+      .style('stroke-dasharray', d => {
+        if (d.stroke_style === 'dashed') return '4,2';
+        if (d.stroke_style === 'dotted') return '2,2';
+        return 'none';
+      });
 
-    // All nodes group
-    const nodes = container.selectAll('.node')
+    // Node groups for massive rendering
+    const nodeGroup = container.append('g').attr('class', 'nodes');
+    const nodes = nodeGroup.selectAll('.node')
       .data(data.nodes)
       .enter()
       .append('g')
       .attr('class', 'node')
       .style('cursor', 'pointer');
 
-    // Topic cluster circles
-    nodes.filter(d => d.type === 'topic_cluster')
-      .append('circle')
-      .attr('r', d => Math.min(50, d.size || 40))
-      .style('fill', d => d.color)
-      .style('opacity', 0.15)
-      .style('stroke', d => d.color)
-      .style('stroke-width', 1);
-
-    // Article bubbles - FIXED
-    const articleNodeGroups = nodes.filter(d => d.type === 'article');
+    // Topic and geographic cluster backgrounds
+    const clusters = nodes.filter(d => d.type === 'topic_cluster' || d.type === 'geographic_cluster');
     
-    articleNodeGroups.append('circle')
-      .attr('r', d => {
-        const titleLength = (d.title || '').length;
-        return Math.max(25, Math.min(50, titleLength * 0.6));
-      })
-      .style('fill', d => d.color || '#3498db')
-      .style('stroke', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
+    clusters.append('circle')
+      .attr('r', d => Math.min(60, d.size || 40))
+      .style('fill', d => d.color)
+      .style('opacity', 0.1)
+      .style('stroke', d => d.color)
       .style('stroke-width', 2)
-      .style('opacity', 0.9);
+      .style('stroke-dasharray', d => d.type === 'geographic_cluster' ? '8,4' : '4,4');
 
-    // Source indicators
-    articleNodeGroups.append('circle')
-      .attr('r', 8)
-      .attr('cx', d => {
-        const radius = Math.max(25, Math.min(50, (d.title || '').length * 0.6));
-        return radius - 6;
-      })
-      .attr('cy', d => {
-        const radius = Math.max(25, Math.min(50, (d.title || '').length * 0.6));
-        return -(radius - 6);
-      })
-      .style('fill', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
-      .style('stroke', '#fff')
-      .style('stroke-width', 2);
-
-    // Headlines - FIXED
-    articleNodeGroups.append('text')
-      .text(d => {
-        const title = d.title || 'Untitled';
-        return title.length > 60 ? title.substring(0, 57) + '...' : title;
-      })
-      .style('font-size', '11px')
-      .style('font-weight', '600')
-      .style('fill', '#2c3e50')
-      .style('text-anchor', 'middle')
-      .attr('dy', d => {
-        const radius = Math.max(25, Math.min(50, (d.title || '').length * 0.6));
-        return radius + 20;
-      })
-      .style('pointer-events', 'none')
-      .each(function(d) {
-        const text = d3.select(this);
-        const title = d.title || 'Untitled';
-        if (title.length > 30) {
-          // Simple text wrapping
-          const words = title.split(' ');
-          const line1 = words.slice(0, Math.ceil(words.length / 2)).join(' ');
-          const line2 = words.slice(Math.ceil(words.length / 2)).join(' ');
-          
-          text.text(line1);
-          if (line2) {
-            text.append('tspan')
-              .attr('x', 0)
-              .attr('dy', '1.2em')
-              .text(line2.length > 30 ? line2.substring(0, 27) + '...' : line2);
-          }
-        }
-      });
-
-    // Topic cluster labels
-    nodes.filter(d => d.type === 'topic_cluster')
-      .append('text')
+    clusters.append('text')
       .text(d => `${d.title} (${d.story_count || 0})`)
-      .style('font-size', '12px')
+      .style('font-size', '11px')
       .style('font-weight', 'bold')
       .style('fill', d => d.color)
       .style('text-anchor', 'middle')
       .style('pointer-events', 'none');
 
-    // Hover effects
-    articleNodeGroups
+    // Article bubbles optimized for massive scale
+    const articles = nodes.filter(d => d.type === 'article');
+    
+    articles.append('circle')
+      .attr('r', d => {
+        // Adaptive sizing for massive scale
+        const titleLength = (d.title || '').length;
+        return Math.max(12, Math.min(25, titleLength * 0.4));  // Smaller for massive view
+      })
+      .style('fill', d => d.color || '#3498db')
+      .style('stroke', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
+      .style('stroke-width', 1.5)
+      .style('opacity', 0.9)
+      .style('filter', 'drop-shadow(0px 1px 3px rgba(0,0,0,0.3))');
+
+    // Source indicators
+    articles.append('circle')
+      .attr('r', 6)
+      .attr('cx', d => {
+        const radius = Math.max(12, Math.min(25, (d.title || '').length * 0.4));
+        return radius - 4;
+      })
+      .attr('cy', d => {
+        const radius = Math.max(12, Math.min(25, (d.title || '').length * 0.4));
+        return -(radius - 4);
+      })
+      .style('fill', d => d.source === 'nyt' ? '#2c3e50' : '#3498db')
+      .style('stroke', '#fff')
+      .style('stroke-width', 1);
+
+    // Headlines - adaptive for massive scale
+    articles.append('text')
+      .text(d => {
+        const title = d.title || 'Untitled';
+        // Shorter truncation for massive scale
+        return title.length > 40 ? title.substring(0, 37) + '...' : title;
+      })
+      .style('font-size', '9px')  // Smaller font for massive scale
+      .style('font-weight', '600')
+      .style('fill', '#2c3e50')
+      .style('text-anchor', 'middle')
+      .attr('dy', d => {
+        const radius = Math.max(12, Math.min(25, (d.title || '').length * 0.4));
+        return radius + 15;
+      })
+      .style('pointer-events', 'none');
+
+    // Efficient interaction system for massive scale
+    articles
       .on('mouseover', function(event, d) {
+        // Simplified hover for performance
         d3.select(this).select('circle')
-          .transition().duration(150)
-          .style('stroke-width', 4)
-          .style('opacity', 1);
+          .transition().duration(100)
+          .style('stroke-width', 3)
+          .attr('r', d => {
+            const titleLength = (d.title || '').length;
+            return Math.max(15, Math.min(30, titleLength * 0.5));
+          });
         
-        // Simple tooltip
+        // Lightweight tooltip
         const tooltip = container.append('g')
-          .attr('class', 'simple-tooltip')
-          .attr('transform', `translate(${d.x + 40}, ${d.y - 30})`);
+          .attr('class', 'quick-tooltip')
+          .attr('transform', `translate(${d.x + 30}, ${d.y - 25})`);
         
         tooltip.append('rect')
-          .attr('width', 250)
-          .attr('height', 60)
-          .attr('rx', 6)
+          .attr('width', 220)
+          .attr('height', 50)
+          .attr('rx', 4)
           .style('fill', 'rgba(0,0,0,0.9)')
           .style('stroke', d.source === 'nyt' ? '#2c3e50' : '#3498db');
         
         tooltip.append('text')
-          .attr('x', 10)
-          .attr('y', 20)
+          .attr('x', 8)
+          .attr('y', 18)
           .style('fill', '#fff')
-          .style('font-size', '12px')
+          .style('font-size', '10px')
           .style('font-weight', 'bold')
-          .text(d.source?.toUpperCase() || 'NEWS');
+          .text(`${d.source?.toUpperCase()} • ${d.topic_cluster || 'News'}`);
         
         tooltip.append('text')
-          .attr('x', 10)
-          .attr('y', 45)
+          .attr('x', 8)
+          .attr('y', 38)
           .style('fill', '#4CAF50')
-          .style('font-size', '10px')
+          .style('font-size', '9px')
           .text('👆 Click for details');
       })
       .on('mouseout', function(event, d) {
         d3.select(this).select('circle')
-          .transition().duration(100)
-          .style('stroke-width', 2)
-          .style('opacity', 0.9);
+          .transition().duration(50)
+          .style('stroke-width', 1.5)
+          .attr('r', d => {
+            const titleLength = (d.title || '').length;
+            return Math.max(12, Math.min(25, titleLength * 0.4));
+          });
         
-        container.selectAll('.simple-tooltip').remove();
+        container.selectAll('.quick-tooltip').remove();
       })
       .on('click', function(event, d) {
         setSelectedNode(d);
@@ -419,10 +461,10 @@ const App = () => {
         });
       });
 
-    // Drag behavior
+    // Optimized drag for massive scale
     const drag = d3.drag()
       .on('start', (event, d) => {
-        if (!event.active) simulation.alphaTarget(0.1).restart();
+        if (!event.active) simulation.alphaTarget(0.05).restart();
         d.fx = d.x; d.fy = d.y;
       })
       .on('drag', (event, d) => {
@@ -433,9 +475,9 @@ const App = () => {
         d.fx = null; d.fy = null;
       });
 
-    articleNodeGroups.call(drag);
+    articles.call(drag);
 
-    // Simulation tick
+    // High-performance tick function
     simulation.on('tick', () => {
       links
         .attr('x1', d => d.source.x)
@@ -445,6 +487,23 @@ const App = () => {
 
       nodes.attr('transform', d => `translate(${d.x},${d.y})`);
     });
+
+    // Improved simulation performance
+    simulation.alpha(0.3).alphaDecay(0.02); // Slower decay for better layout
+    
+    // Add performance monitoring
+    let tickCount = 0;
+    const maxTicks = 300; // Limit ticks for massive scale
+    
+    simulation.on('tick.counter', () => {
+      tickCount++;
+      if (tickCount > maxTicks) {
+        simulation.stop();
+        console.log(`🎯 MASSIVE SCALE: Simulation completed after ${tickCount} ticks`);
+      }
+    });
+
+    console.log(`📊 MASSIVE SCALE: Graph rendered successfully - ${articleNodes.length} bubbles connected by ${data.edges.length} relationships`);
   };
 
   return (

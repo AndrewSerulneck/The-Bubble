@@ -685,6 +685,261 @@ class UltimateNewsProcessor:
             logger.error(f"Error processing NYT story: {e}")
             return None
     
+    async def process_massive_story_collection(self, guardian_stories: List[Dict], nyt_stories: List[Dict], user_prefs: UserPreferences) -> List[EnhancedStory]:
+        """Process hundreds of stories with intelligent batching and parallel processing"""
+        
+        logger.info(f"Processing massive collection: {len(guardian_stories)} Guardian + {len(nyt_stories)} NYT stories")
+        
+        all_stories = []
+        batch_size = 20  # Process 20 stories per batch for efficiency
+        
+        # Create processing batches
+        guardian_batches = [guardian_stories[i:i + batch_size] for i in range(0, len(guardian_stories), batch_size)]
+        nyt_batches = [nyt_stories[i:i + batch_size] for i in range(0, len(nyt_stories), batch_size)]
+        
+        # Process Guardian batches
+        for batch_index, batch in enumerate(guardian_batches):
+            logger.info(f"Processing Guardian batch {batch_index + 1}/{len(guardian_batches)}")
+            
+            tasks = []
+            for story in batch:
+                # Use fast processing for massive scale
+                tasks.append(self._process_guardian_story_fast(story, user_prefs))
+            
+            try:
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in batch_results:
+                    if isinstance(result, EnhancedStory):
+                        all_stories.append(result)
+                    elif isinstance(result, Exception):
+                        logger.warning(f"Guardian story processing failed: {result}")
+            except Exception as e:
+                logger.error(f"Guardian batch {batch_index} failed: {e}")
+        
+        # Process NYT batches
+        for batch_index, batch in enumerate(nyt_batches):
+            logger.info(f"Processing NYT batch {batch_index + 1}/{len(nyt_batches)}")
+            
+            tasks = []
+            for story in batch:
+                # Use fast processing for massive scale
+                tasks.append(self._process_nyt_story_fast(story, user_prefs))
+            
+            try:
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                for result in batch_results:
+                    if isinstance(result, EnhancedStory):
+                        all_stories.append(result)
+                    elif isinstance(result, Exception):
+                        logger.warning(f"NYT story processing failed: {result}")
+            except Exception as e:
+                logger.error(f"NYT batch {batch_index} failed: {e}")
+        
+        logger.info(f"Successfully processed {len(all_stories)} stories out of {len(guardian_stories) + len(nyt_stories)} total")
+        return all_stories
+
+    async def create_massive_knowledge_graph(self, stories: List[EnhancedStory], raw_stories: List[Dict], user_prefs: UserPreferences) -> Dict[str, Any]:
+        """Create a comprehensive knowledge graph with hundreds of interconnected stories"""
+        
+        logger.info(f"Creating massive knowledge graph with {len(stories)} processed stories")
+        
+        # Enhanced topic classification for massive datasets
+        topics_distribution = {}
+        geographic_distribution = {}
+        temporal_distribution = {}
+        
+        # Create nodes with enhanced clustering
+        nodes = []
+        topic_clusters = {}
+        geographic_clusters = {}
+        
+        for story in stories:
+            # Enhanced topic classification
+            topic = self._classify_story_topic_enhanced(story)
+            if topic not in topic_clusters:
+                topic_clusters[topic] = []
+            topic_clusters[topic].append(story.id)
+            
+            # Geographic clustering
+            geo_region = self._extract_geographic_region(story)
+            if geo_region not in geographic_clusters:
+                geographic_clusters[geo_region] = []
+            geographic_clusters[geo_region].append(story.id)
+            
+            # Enhanced node with more metadata
+            node = {
+                "id": story.id,
+                "type": "article",
+                "source": story.source,
+                "title": story.title,
+                "summary": story.summary[:300],  # Limit for performance
+                "lede": story.lede,
+                "section": story.section,
+                "topic_cluster": topic,
+                "geographic_region": geo_region,
+                "publication_date": story.publication_date.isoformat(),
+                "url": story.url,
+                "author": story.author or "Staff",
+                "sentiment_score": story.sentiment_score,
+                "complexity_level": story.complexity_level,
+                "read_time_minutes": story.read_time_minutes,
+                "size": max(15, min(40, len(story.title) // 5)),  # Scaled for massive view
+                "color": self._get_enhanced_topic_color(topic, story.sentiment_score),
+                "entities": story.entities[:5],  # Limit for performance
+                "categories": story.categories,
+                "influence_score": self._calculate_influence_score(story),
+                # Position hints for massive layout
+                "cluster_x": self._get_cluster_x_position(topic),
+                "cluster_y": self._get_cluster_y_position(topic),
+                "geographic_x": self._get_geographic_x_position(geo_region),
+                "geographic_y": self._get_geographic_y_position(geo_region)
+            }
+            nodes.append(node)
+            
+            # Update distributions
+            topics_distribution[topic] = topics_distribution.get(topic, 0) + 1
+            geographic_distribution[geo_region] = geographic_distribution.get(geo_region, 0) + 1
+        
+        # Create topic cluster nodes for major clusters
+        cluster_nodes = []
+        for topic, story_ids in topic_clusters.items():
+            if len(story_ids) >= 5:  # Only create clusters with 5+ stories
+                cluster_nodes.append({
+                    "id": f"topic_{topic.lower().replace(' ', '_').replace('&', 'and')}",
+                    "type": "topic_cluster",
+                    "title": topic,
+                    "size": min(80, 40 + len(story_ids) * 2),  # Scale with story count
+                    "color": self._get_topic_cluster_color(topic),
+                    "story_count": len(story_ids),
+                    "cluster_type": "topic",
+                    "x": self._get_cluster_x_position(topic),
+                    "y": self._get_cluster_y_position(topic)
+                })
+        
+        # Create geographic cluster nodes for major regions
+        for region, story_ids in geographic_clusters.items():
+            if len(story_ids) >= 8 and region != "Global":  # Only create clusters with 8+ stories
+                cluster_nodes.append({
+                    "id": f"geo_{region.lower().replace(' ', '_')}",
+                    "type": "geographic_cluster",
+                    "title": f"📍 {region}",
+                    "size": min(70, 35 + len(story_ids) * 1.5),
+                    "color": self._get_geographic_cluster_color(region),
+                    "story_count": len(story_ids),
+                    "cluster_type": "geographic",
+                    "x": self._get_geographic_x_position(region),
+                    "y": self._get_geographic_y_position(region)
+                })
+        
+        nodes.extend(cluster_nodes)
+        
+        # Advanced connection analysis for massive datasets
+        edges = []
+        if ai_analyzer and len(raw_stories) > 1:
+            # Analyze connections in intelligent batches
+            connections = await self._analyze_massive_story_connections(raw_stories, user_prefs)
+            
+            for connection in connections:
+                is_causal = connection.connection_type in ['causal', 'economic_causal', 'political_causal', 'social_causal', 'environmental_causal', 'indirect_causal']
+                
+                edge = {
+                    "source": connection.source_id,
+                    "target": connection.target_id,
+                    "type": connection.connection_type,
+                    "strength": connection.strength,
+                    "confidence": connection.confidence,
+                    "explanation": connection.explanation,
+                    "keywords": connection.keywords[:3],  # Limit for performance
+                    "evidence_score": connection.evidence_score,
+                    "temporal_relationship": connection.temporal_relationship,
+                    "is_causal": is_causal,
+                    "width": max(1, min(8, connection.strength * 12)) if is_causal else max(1, connection.strength * 6),
+                    "opacity": max(0.2, min(0.8, connection.confidence)),
+                    "stroke_style": "solid" if is_causal else "dashed",
+                    "causal_indicator": "→" if is_causal else "↔",
+                    "connection_id": f"{connection.source_id}_{connection.target_id}"
+                }
+                edges.append(edge)
+        
+        # Add cluster membership edges
+        for story in stories:
+            # Topic cluster connections
+            topic_cluster_id = f"topic_{self._classify_story_topic_enhanced(story).lower().replace(' ', '_').replace('&', 'and')}"
+            if any(node["id"] == topic_cluster_id for node in nodes):
+                edges.append({
+                    "source": story.id,
+                    "target": topic_cluster_id,
+                    "type": "belongs_to_topic_cluster",
+                    "strength": 0.3,
+                    "width": 1,
+                    "opacity": 0.2,
+                    "stroke_style": "dotted"
+                })
+            
+            # Geographic cluster connections
+            geo_region = self._extract_geographic_region(story)
+            geo_cluster_id = f"geo_{geo_region.lower().replace(' ', '_')}"
+            if any(node["id"] == geo_cluster_id for node in nodes):
+                edges.append({
+                    "source": story.id,
+                    "target": geo_cluster_id,
+                    "type": "belongs_to_geographic_cluster",
+                    "strength": 0.2,
+                    "width": 1,
+                    "opacity": 0.15,
+                    "stroke_style": "dotted"
+                })
+        
+        # Calculate advanced statistics
+        causal_connections = [e for e in edges if e.get("is_causal", False)]
+        cross_source_connections = [e for e in edges if self._is_cross_source_connection(e, stories)]
+        
+        logger.info(f"Generated massive graph: {len(nodes)} nodes, {len(edges)} edges, {len(causal_connections)} causal connections")
+        
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "metadata": {
+                "total_articles": len([n for n in nodes if n["type"] == "article"]),
+                "total_topic_clusters": len([n for n in nodes if n["type"] == "topic_cluster"]),
+                "total_geographic_clusters": len([n for n in nodes if n["type"] == "geographic_cluster"]),
+                "total_causal_connections": len(causal_connections),
+                "total_cross_source_connections": len(cross_source_connections),
+                "total_all_connections": len([e for e in edges if not e["type"].startswith("belongs_to")]),
+                "generated_at": datetime.now().isoformat(),
+                "ai_analysis_enabled": True,
+                "user_preferences": user_prefs.dict(),
+                "topics_distribution": topics_distribution,
+                "geographic_distribution": geographic_distribution,
+                "processing_mode": "massive_scale",
+                "data_quality": {
+                    "deduplication_applied": True,
+                    "batch_processing": True,
+                    "parallel_processing": True,
+                    "advanced_clustering": True
+                },
+                "advanced_features": {
+                    "massive_scale": True,
+                    "topic_clustering": True,
+                    "geographic_clustering": True,
+                    "causal_analysis": True,
+                    "cross_source_analysis": True,
+                    "influence_metrics": True,
+                    "real_time_processing": True
+                },
+                "performance_metrics": {
+                    "nodes_count": len(nodes),
+                    "edges_count": len(edges),
+                    "processing_batches": len(stories) // 20 + 1,
+                    "unique_sources": len(set(s.source for s in stories)),
+                    "complexity_distribution": {
+                        str(i): len([s for s in stories if s.complexity_level == i]) 
+                        for i in range(1, 6)
+                    }
+                }
+            }
+        }
+
     async def process_multi_source_stories(self, guardian_stories: List[Dict], nyt_stories: List[Dict], user_prefs: UserPreferences) -> List[EnhancedStory]:
         all_stories = []
         
@@ -1024,6 +1279,23 @@ class UltimateNewsProcessor:
         
         return base_color
     
+    def _get_simple_topic_color(self, topic: str) -> str:
+        """Get simple color for topic without sentiment modification"""
+        base_colors = {
+            'Business & Economy': '#f39c12',
+            'Politics & Government': '#3498db', 
+            'Fashion & Style': '#e91e63',
+            'Culture & Arts': '#9c27b0',
+            'Restaurants & Food': '#ff5722',
+            'Technology': '#673ab7',
+            'Environment & Climate': '#4caf50',
+            'Health & Medicine': '#00bcd4',
+            'Sports': '#8bc34a',
+            'Security & Conflict': '#f44336',
+            'General News': '#607d8b'
+        }
+        return base_colors.get(topic, '#95a5a6')
+    
     def _get_topic_cluster_color(self, topic: str) -> str:
         """Get darker cluster color for topic group nodes"""
         colors = {
@@ -1074,6 +1346,405 @@ class UltimateNewsProcessor:
             'General News': 0.5
         }
         return positions.get(topic, 0.5)
+    
+    def _classify_story_topic_enhanced(self, story: EnhancedStory) -> str:
+        """Enhanced topic classification for massive datasets with more granular categories"""
+        section = story.section.lower()
+        title = story.title.lower()
+        entities = [e.lower() for e in story.entities]
+        
+        # Enhanced classification with more categories
+        if any(term in title for term in ['restaurant', 'food', 'dining', 'chef', 'cooking', 'recipe', 'cuisine', 'culinary']):
+            return 'Restaurants & Food'
+        elif any(term in title for term in ['fashion', 'style', 'clothing', 'designer', 'runway', 'beauty', 'makeup', 'cosmetics']):
+            return 'Fashion & Style'
+        elif any(term in section for term in ['business', 'finance', 'economy', 'money', 'market']) or \
+             any(term in title for term in ['market', 'stock', 'economy', 'business', 'company', 'earnings', 'profit', 'revenue', 'investment']):
+            return 'Business & Economy'
+        elif any(term in section for term in ['politics', 'government', 'election']) or \
+             any(term in title for term in ['election', 'congress', 'president', 'government', 'policy', 'vote', 'campaign', 'senate']):
+            return 'Politics & Government'
+        elif any(term in section for term in ['culture', 'arts', 'entertainment']) or \
+             any(term in title for term in ['art', 'museum', 'culture', 'theater', 'music', 'film', 'movie', 'book', 'literature']):
+            return 'Culture & Arts'
+        elif any(term in section for term in ['technology', 'tech']) or \
+             any(term in title for term in ['technology', 'tech', 'ai', 'software', 'digital', 'internet', 'app', 'startup']):
+            return 'Technology'
+        elif any(term in section for term in ['environment', 'climate']) or \
+             any(term in title for term in ['climate', 'environment', 'green', 'carbon', 'renewable', 'sustainability', 'global warming']):
+            return 'Environment & Climate'
+        elif any(term in section for term in ['health', 'medicine', 'wellness']) or \
+             any(term in title for term in ['health', 'medical', 'doctor', 'hospital', 'disease', 'treatment', 'vaccine', 'mental health']):
+            return 'Health & Medicine'
+        elif any(term in section for term in ['sport', 'sports']) or \
+             any(term in title for term in ['sport', 'game', 'team', 'player', 'match', 'championship', 'league', 'tournament']):
+            return 'Sports'
+        elif any(term in title for term in ['war', 'conflict', 'military', 'defense', 'security', 'terrorism', 'violence', 'attack']):
+            return 'Security & Conflict'
+        elif any(term in title for term in ['travel', 'tourism', 'vacation', 'destination', 'hotel', 'airline']):
+            return 'Travel & Tourism'
+        elif any(term in title for term in ['education', 'school', 'university', 'college', 'student', 'teacher', 'learning']):
+            return 'Education'
+        elif any(term in title for term in ['science', 'research', 'study', 'discovery', 'innovation', 'breakthrough']):
+            return 'Science & Research'
+        else:
+            return 'General News'
+    
+    def _extract_geographic_region(self, story: EnhancedStory) -> str:
+        """Extract geographic region from story content"""
+        title = story.title.lower()
+        content = (story.summary or story.lede or '').lower()
+        
+        # Geographic keywords mapping
+        regions = {
+            'North America': ['usa', 'america', 'united states', 'canada', 'mexico', 'toronto', 'vancouver', 'new york', 'california', 'texas', 'florida'],
+            'Europe': ['europe', 'uk', 'britain', 'france', 'germany', 'italy', 'spain', 'london', 'paris', 'berlin', 'brexit', 'eu', 'european'],
+            'Asia Pacific': ['china', 'japan', 'korea', 'india', 'singapore', 'australia', 'tokyo', 'beijing', 'mumbai', 'sydney', 'asian'],
+            'Middle East': ['middle east', 'israel', 'palestine', 'iran', 'iraq', 'saudi', 'dubai', 'jerusalem', 'tehran', 'arab'],
+            'Africa': ['africa', 'south africa', 'nigeria', 'egypt', 'kenya', 'cairo', 'lagos', 'johannesburg', 'african'],
+            'Latin America': ['brazil', 'argentina', 'chile', 'colombia', 'peru', 'mexico city', 'sao paulo', 'buenos aires', 'latin america']
+        }
+        
+        for region, keywords in regions.items():
+            if any(keyword in title or keyword in content for keyword in keywords):
+                return region
+        
+        return 'Global'
+    
+    def _get_enhanced_topic_color(self, topic: str, sentiment: float = 0.0) -> str:
+        """Enhanced color scheme for massive visualization"""
+        base_colors = {
+            'Business & Economy': '#f39c12',
+            'Politics & Government': '#3498db', 
+            'Fashion & Style': '#e91e63',
+            'Culture & Arts': '#9c27b0',
+            'Restaurants & Food': '#ff5722',
+            'Technology': '#673ab7',
+            'Environment & Climate': '#4caf50',
+            'Health & Medicine': '#00bcd4',
+            'Sports': '#8bc34a',
+            'Security & Conflict': '#f44336',
+            'Travel & Tourism': '#ff9800',
+            'Education': '#2196f3',
+            'Science & Research': '#795548',
+            'General News': '#607d8b'
+        }
+        
+        base_color = base_colors.get(topic, '#95a5a6')
+        
+        # Sentiment-based color modification for negative stories
+        if sentiment < -0.3:
+            return '#d32f2f'  # Red for very negative stories
+        
+        return base_color
+    
+    def _calculate_influence_score(self, story: EnhancedStory) -> float:
+        """Calculate story influence score based on various factors"""
+        score = 0.5  # Base score
+        
+        # Source credibility
+        if story.source == 'nyt':
+            score += 0.2
+        elif story.source == 'guardian':
+            score += 0.15
+        
+        # Section importance
+        important_sections = ['politics', 'business', 'international', 'technology']
+        if any(section in story.section.lower() for section in important_sections):
+            score += 0.15
+        
+        # Headline length (longer headlines often indicate more important stories)
+        if len(story.title) > 80:
+            score += 0.1
+        
+        # Complexity level
+        score += story.complexity_level * 0.05
+        
+        # Entity count (more entities = more connected story)
+        score += min(0.1, len(story.entities) * 0.02)
+        
+        return min(1.0, score)
+    
+    def _get_geographic_x_position(self, region: str) -> float:
+        """Get X position for geographic clustering"""
+        positions = {
+            'North America': 0.2,
+            'Europe': 0.5,
+            'Asia Pacific': 0.8,
+            'Middle East': 0.6,
+            'Africa': 0.4,
+            'Latin America': 0.3,
+            'Global': 0.5
+        }
+        return positions.get(region, 0.5)
+    
+    def _get_geographic_y_position(self, region: str) -> float:
+        """Get Y position for geographic clustering"""
+        positions = {
+            'North America': 0.3,
+            'Europe': 0.2,
+            'Asia Pacific': 0.4,
+            'Middle East': 0.6,
+            'Africa': 0.8,
+            'Latin America': 0.7,
+            'Global': 0.5
+        }
+        return positions.get(region, 0.5)
+    
+    def _get_geographic_cluster_color(self, region: str) -> str:
+        """Get color for geographic clusters"""
+        colors = {
+            'North America': '#1f77b4',
+            'Europe': '#ff7f0e',
+            'Asia Pacific': '#2ca02c',
+            'Middle East': '#d62728',
+            'Africa': '#9467bd',
+            'Latin America': '#8c564b',
+            'Global': '#7f7f7f'
+        }
+        return colors.get(region, '#bcbd22')
+    
+    async def _analyze_massive_story_connections(self, stories: List[Dict], user_prefs: UserPreferences) -> List[AdvancedConnection]:
+        """Analyze connections for massive datasets with intelligent sampling"""
+        if len(stories) < 2:
+            return []
+        
+        # For massive datasets, analyze connections in strategic samples
+        # Take most recent stories + random sample for comprehensive coverage
+        recent_stories = sorted(stories, key=lambda x: x.get('webPublicationDate', x.get('pub_date', '')), reverse=True)[:50]
+        
+        # Add random sample from remaining stories for diversity
+        import random
+        remaining_stories = [s for s in stories if s not in recent_stories]
+        if remaining_stories:
+            sample_size = min(30, len(remaining_stories))
+            random_sample = random.sample(remaining_stories, sample_size)
+            analysis_stories = recent_stories + random_sample
+        else:
+            analysis_stories = recent_stories
+        
+        # Use existing connection analysis method
+        return await ai_analyzer.analyze_story_connections(analysis_stories[:25], user_prefs)
+    
+    def _is_cross_source_connection(self, edge: Dict, stories: List[EnhancedStory]) -> bool:
+        """Check if connection is between different news sources"""
+        source_story = next((s for s in stories if s.id == edge['source']), None)
+        target_story = next((s for s in stories if s.id == edge['target']), None)
+        
+        if source_story and target_story:
+            return source_story.source != target_story.source
+        return False
+    
+    def _classify_story_topic_enhanced(self, story: EnhancedStory) -> str:
+        """Enhanced topic classification for massive datasets"""
+        section = story.section.lower()
+        title = story.title.lower()
+        entities = [e.lower() for e in story.entities]
+        
+        # Enhanced topic classification with more granular categories
+        if any(term in title for term in ['restaurant', 'food', 'dining', 'chef', 'cooking', 'recipe', 'cuisine']):
+            return 'Food & Dining'
+        elif any(term in title for term in ['fashion', 'style', 'clothing', 'designer', 'runway', 'beauty', 'luxury']):
+            return 'Fashion & Lifestyle'
+        elif any(term in section for term in ['business', 'finance', 'economy', 'money']) or \
+             any(term in title for term in ['market', 'stock', 'economy', 'business', 'company', 'earnings', 'profit', 'investment']):
+            return 'Business & Finance'
+        elif any(term in section for term in ['politics', 'government']) or \
+             any(term in title for term in ['election', 'congress', 'president', 'government', 'policy', 'vote', 'campaign']):
+            return 'Politics & Government'
+        elif any(term in section for term in ['culture', 'arts']) or \
+             any(term in title for term in ['art', 'museum', 'culture', 'theater', 'music', 'film', 'book', 'entertainment']):
+            return 'Arts & Culture'
+        elif any(term in section for term in ['technology', 'tech']) or \
+             any(term in title for term in ['technology', 'tech', 'ai', 'software', 'digital', 'internet', 'innovation']):
+            return 'Technology & Innovation'
+        elif any(term in section for term in ['environment', 'climate']) or \
+             any(term in title for term in ['climate', 'environment', 'green', 'carbon', 'renewable', 'sustainability']):
+            return 'Environment & Climate'
+        elif any(term in section for term in ['health', 'medicine']) or \
+             any(term in title for term in ['health', 'medical', 'doctor', 'hospital', 'disease', 'treatment', 'healthcare']):
+            return 'Health & Medicine'
+        elif any(term in section for term in ['sport', 'sports']) or \
+             any(term in title for term in ['sport', 'game', 'team', 'player', 'match', 'championship', 'olympics']):
+            return 'Sports & Recreation'
+        elif any(term in title for term in ['war', 'conflict', 'military', 'defense', 'security', 'terrorism', 'violence']):
+            return 'Security & Conflict'
+        elif any(term in title for term in ['education', 'school', 'university', 'student', 'teacher', 'learning']):
+            return 'Education & Learning'
+        elif any(term in title for term in ['travel', 'tourism', 'vacation', 'destination', 'hotel']):
+            return 'Travel & Tourism'
+        else:
+            return 'General News'
+    
+    def _extract_geographic_region(self, story: EnhancedStory) -> str:
+        """Extract geographic region from story content"""
+        title = story.title.lower()
+        section = story.section.lower()
+        
+        # Geographic classification based on content
+        if any(term in title for term in ['china', 'chinese', 'beijing', 'shanghai']):
+            return 'China'
+        elif any(term in title for term in ['russia', 'russian', 'moscow', 'putin']):
+            return 'Russia'
+        elif any(term in title for term in ['europe', 'european', 'eu', 'brexit', 'germany', 'france', 'uk', 'britain']):
+            return 'Europe'
+        elif any(term in title for term in ['india', 'indian', 'delhi', 'mumbai']):
+            return 'India'
+        elif any(term in title for term in ['japan', 'japanese', 'tokyo']):
+            return 'Japan'
+        elif any(term in title for term in ['africa', 'african', 'nigeria', 'south africa']):
+            return 'Africa'
+        elif any(term in title for term in ['middle east', 'israel', 'palestine', 'iran', 'saudi']):
+            return 'Middle East'
+        elif any(term in title for term in ['latin america', 'brazil', 'mexico', 'argentina']):
+            return 'Latin America'
+        elif any(term in title for term in ['canada', 'canadian']):
+            return 'Canada'
+        elif any(term in title for term in ['australia', 'australian']):
+            return 'Australia'
+        elif any(term in title for term in ['us', 'america', 'american', 'washington', 'new york']):
+            return 'United States'
+        else:
+            return 'Global'
+    
+    def _get_enhanced_topic_color(self, topic: str, sentiment: float = 0.0) -> str:
+        """Enhanced color scheme for massive datasets"""
+        base_colors = {
+            'Business & Finance': '#f39c12',
+            'Politics & Government': '#3498db',
+            'Fashion & Lifestyle': '#e91e63',
+            'Arts & Culture': '#9c27b0',
+            'Food & Dining': '#ff5722',
+            'Technology & Innovation': '#673ab7',
+            'Environment & Climate': '#4caf50',
+            'Health & Medicine': '#00bcd4',
+            'Sports & Recreation': '#8bc34a',
+            'Security & Conflict': '#f44336',
+            'Education & Learning': '#ff9800',
+            'Travel & Tourism': '#795548',
+            'General News': '#607d8b'
+        }
+        
+        base_color = base_colors.get(topic, '#95a5a6')
+        
+        # Sentiment-based color modification
+        if sentiment > 0.4:
+            return base_color  # Positive stories keep vibrant colors
+        elif sentiment < -0.4:
+            return '#d32f2f'  # Very negative stories get red
+        elif sentiment < -0.2:
+            return '#ff5722'  # Moderately negative get orange-red
+        
+        return base_color
+    
+    def _calculate_influence_score(self, story: EnhancedStory) -> float:
+        """Calculate influence score for massive datasets"""
+        score = 0.5  # Base score
+        
+        # Source influence
+        if story.source == 'nyt':
+            score += 0.2
+        elif story.source == 'guardian':
+            score += 0.15
+        
+        # Section influence
+        high_influence_sections = ['politics', 'business', 'world', 'technology']
+        if any(section in story.section.lower() for section in high_influence_sections):
+            score += 0.15
+        
+        # Title length and complexity
+        if len(story.title) > 80:
+            score += 0.1
+        
+        # Sentiment extremes tend to be more influential
+        if abs(story.sentiment_score) > 0.5:
+            score += 0.1
+        
+        return min(1.0, score)
+    
+    def _get_geographic_x_position(self, region: str) -> float:
+        """Get X position for geographic clustering"""
+        positions = {
+            'United States': 0.2,
+            'Europe': 0.5,
+            'China': 0.8,
+            'Russia': 0.7,
+            'India': 0.75,
+            'Japan': 0.85,
+            'Africa': 0.45,
+            'Middle East': 0.6,
+            'Latin America': 0.15,
+            'Canada': 0.25,
+            'Australia': 0.9,
+            'Global': 0.5
+        }
+        return positions.get(region, 0.5)
+    
+    def _get_geographic_y_position(self, region: str) -> float:
+        """Get Y position for geographic clustering"""
+        positions = {
+            'United States': 0.4,
+            'Europe': 0.2,
+            'China': 0.3,
+            'Russia': 0.15,
+            'India': 0.5,
+            'Japan': 0.25,
+            'Africa': 0.7,
+            'Middle East': 0.45,
+            'Latin America': 0.8,
+            'Canada': 0.1,
+            'Australia': 0.85,
+            'Global': 0.5
+        }
+        return positions.get(region, 0.5)
+    
+    def _get_geographic_cluster_color(self, region: str) -> str:
+        """Get color for geographic clusters"""
+        colors = {
+            'United States': '#2980b9',
+            'Europe': '#8e44ad',
+            'China': '#c0392b',
+            'Russia': '#d35400',
+            'India': '#f39c12',
+            'Japan': '#e74c3c',
+            'Africa': '#27ae60',
+            'Middle East': '#f1c40f',
+            'Latin America': '#e67e22',
+            'Canada': '#3498db',
+            'Australia': '#9b59b6',
+            'Global': '#34495e'
+        }
+        return colors.get(region, '#7f8c8d')
+    
+    async def _analyze_massive_story_connections(self, raw_stories: List[Dict], user_prefs: UserPreferences) -> List[AdvancedConnection]:
+        """Analyze connections for massive datasets with intelligent batching"""
+        if not ai_analyzer or len(raw_stories) < 2:
+            return []
+        
+        # Process in smaller batches for massive datasets
+        batch_size = 6  # Smaller batches for better performance
+        all_connections = []
+        
+        # Process stories in batches
+        for i in range(0, min(len(raw_stories), 30), batch_size):  # Limit to 30 stories max
+            batch = raw_stories[i:i + batch_size]
+            if len(batch) >= 2:
+                try:
+                    batch_connections = await ai_analyzer.analyze_story_connections(batch, user_prefs)
+                    all_connections.extend(batch_connections)
+                except Exception as e:
+                    logger.warning(f"Batch connection analysis failed: {e}")
+        
+        return all_connections[:20]  # Limit total connections for performance
+    
+    def _is_cross_source_connection(self, edge: Dict, stories: List[EnhancedStory]) -> bool:
+        """Check if connection is between different sources"""
+        source_story = next((s for s in stories if s.id == edge["source"]), None)
+        target_story = next((s for s in stories if s.id == edge["target"]), None)
+        
+        if source_story and target_story:
+            return source_story.source != target_story.source
+        return False
 
 # Initialize ultimate processor
 news_processor = UltimateNewsProcessor()
@@ -1185,12 +1856,13 @@ async def search_ultimate_news(
         guardian_stories = [s for s in all_results if 'webTitle' in s]
         nyt_stories = [s for s in all_results if 'headline' in s]
         
-        processed_stories = await news_processor.process_multi_source_stories(
+        # Massive parallel processing
+        processed_stories = await news_processor.process_massive_story_collection(
             guardian_stories, nyt_stories, user_prefs
         )
         
-        # Create knowledge graph
-        knowledge_graph = await news_processor.create_ultimate_knowledge_graph(
+        # Create comprehensive knowledge graph with advanced clustering
+        knowledge_graph = await news_processor.create_massive_knowledge_graph(
             processed_stories, all_results, user_prefs
         )
         
@@ -1228,17 +1900,17 @@ async def track_analytics_v3(analytics_data: AnalyticsData):
 @app.get("/api/v4/knowledge-graph/ultimate")
 async def get_ultimate_knowledge_graph(
     background_tasks: BackgroundTasks,
-    days: int = Query(default=3, ge=1, le=14),
+    days: int = Query(default=7, ge=1, le=30),  # Extended range
     sources: str = Query(default="guardian,nyt"),
     section: Optional[str] = Query(default=None),
     complexity_level: int = Query(default=3, ge=1, le=5),
     geographic_focus: Optional[str] = Query(default=None),
-    max_articles: int = Query(default=12, ge=5, le=20),  # Reduced from 25 to 12
+    max_articles: int = Query(default=300, ge=50, le=500),  # MASSIVELY INCREASED
     session_id: str = Query(default_factory=lambda: str(uuid.uuid4()))
 ):
-    """Optimized knowledge graph with faster processing"""
+    """Massive knowledge graph with hundreds of interconnected stories"""
     
-    cache_key = f"fast_graph:{days}:{sources}:{section}:{complexity_level}:{max_articles}"
+    cache_key = f"massive_graph:{days}:{sources}:{section}:{complexity_level}:{max_articles}"
     
     cached_result = await news_processor.get_cached_result(cache_key)
     if cached_result:
@@ -1246,8 +1918,8 @@ async def get_ultimate_knowledge_graph(
             analytics_manager.track_event,
             AnalyticsData(
                 session_id=session_id,
-                action="view_cached_fast_graph",
-                metadata={"cache_hit": True, "sources": sources}
+                action="view_cached_massive_graph",
+                metadata={"cache_hit": True, "sources": sources, "article_count": max_articles}
             )
         )
         return cached_result
@@ -1261,92 +1933,103 @@ async def get_ultimate_knowledge_graph(
         to_date = datetime.now().strftime('%Y-%m-%d')
         from_date = (datetime.now() - timedelta(days=days)).strftime('%Y-%m-%d')
         
-        # Faster multi-source data fetching with timeouts
+        # MASSIVE multi-source data fetching with batch processing
         source_list = sources.split(',')
+        
+        # Batch API calls for hundreds of stories
+        all_stories = []
+        batch_size = 50
+        
         async with MultiSourceNewsClient() as client:
-            tasks = {}
+            tasks = []
             
             if 'guardian' in source_list:
-                tasks['guardian'] = asyncio.wait_for(
-                    client.search_guardian(
-                        section=section,
-                        from_date=from_date,
-                        to_date=to_date,
-                        page_size=max_articles//2
-                    ), timeout=10.0  # 10 second timeout
-                )
+                # Multiple batches for Guardian
+                for page in range(1, (max_articles // batch_size) + 1):
+                    tasks.append(asyncio.wait_for(
+                        client.search_guardian(
+                            section=section,
+                            from_date=from_date,
+                            to_date=to_date,
+                            page_size=batch_size,
+                            page=page
+                        ), timeout=15.0
+                    ))
             
             if 'nyt' in source_list:
-                tasks['nyt'] = asyncio.wait_for(
-                    client.search_nyt(
-                        section=section,
-                        from_date=from_date,
-                        to_date=to_date,
-                        page_size=max_articles//2
-                    ), timeout=10.0  # 10 second timeout
-                )
+                # Multiple batches for NYT
+                for page in range(0, (max_articles // batch_size)):
+                    tasks.append(asyncio.wait_for(
+                        client.search_nyt(
+                            section=section,
+                            from_date=from_date,
+                            to_date=to_date,
+                            page_size=batch_size,
+                            page=page
+                        ), timeout=15.0
+                    ))
             
-            # Run API calls in parallel for speed
-            source_results = {}
-            for source, task in tasks.items():
+            # Execute all batch requests in parallel
+            batch_results = []
+            for i in range(0, len(tasks), 5):  # Process 5 batches at a time
+                batch = tasks[i:i+5]
                 try:
-                    source_results[source] = await task
-                except asyncio.TimeoutError:
-                    logger.warning(f"{source} API timeout, using fallback")
-                    source_results[source] = []
+                    results = await asyncio.gather(*batch, return_exceptions=True)
+                    for result in results:
+                        if isinstance(result, list):
+                            batch_results.extend(result)
+                        elif isinstance(result, Exception):
+                            logger.warning(f"Batch request failed: {result}")
                 except Exception as e:
-                    logger.error(f"{source} API error: {e}")
-                    source_results[source] = []
+                    logger.error(f"Batch processing error: {e}")
         
-        raw_stories = []
-        guardian_stories = source_results.get('guardian', [])
-        nyt_stories = source_results.get('nyt', [])
+        # Deduplicate stories by URL and title
+        unique_stories = {}
+        for story in batch_results:
+            story_url = story.get('webUrl') or story.get('web_url', '')
+            story_title = story.get('webTitle') or story.get('headline', {}).get('main', '')
+            
+            key = f"{story_url}_{story_title}"
+            if key not in unique_stories and story_url and story_title:
+                unique_stories[key] = story
         
-        raw_stories.extend(guardian_stories)
-        raw_stories.extend(nyt_stories)
+        raw_stories = list(unique_stories.values())[:max_articles]
         
-        # Limit total stories for faster processing
-        raw_stories = raw_stories[:max_articles]
+        logger.info(f"Fetched {len(raw_stories)} unique stories for massive graph")
         
-        if not raw_stories:
-            logger.info("No stories found, using demo data")
+        if len(raw_stories) < 10:
+            logger.info("Insufficient stories found, using demo data")
             return await get_ultimate_demo_graph()
         
-        # Fast processing with parallel story analysis
-        processed_stories = await news_processor.process_multi_source_stories_fast(
-            guardian_stories[:max_articles//2], 
-            nyt_stories[:max_articles//2], 
-            user_prefs
+        # Process stories in large batches
+        guardian_stories = [s for s in raw_stories if 'webTitle' in s]
+        nyt_stories = [s for s in raw_stories if 'headline' in s]
+        
+        # Use massive processing methods for larger batches
+        processed_stories = await news_processor.process_massive_story_collection(
+            guardian_stories, nyt_stories, user_prefs
         )
         
-        # Fallback to regular processing if fast fails
-        if not processed_stories:
-            logger.info("Fast processing failed, using regular processing")
-            processed_stories = await news_processor.process_multi_source_stories(
-                guardian_stories[:6], 
-                nyt_stories[:6], 
-                user_prefs
-            )
-        
-        # Create optimized knowledge graph
-        knowledge_graph = await news_processor.create_ultimate_knowledge_graph(
+        # Create comprehensive knowledge graph with massive method
+        knowledge_graph = await news_processor.create_massive_knowledge_graph(
             processed_stories, raw_stories, user_prefs
         )
         
-        # Cache result for 15 minutes (shorter cache for faster updates)
+        # Enhanced caching for large datasets
         await news_processor.set_cached_result(cache_key, knowledge_graph)
         
-        # Track analytics
+        # Track massive analytics
         background_tasks.add_task(
             analytics_manager.track_event,
             AnalyticsData(
                 session_id=session_id,
-                action="generate_fast_graph",
+                action="generate_massive_graph",
                 metadata={
                     "sources_used": source_list,
                     "total_stories": len(processed_stories),
                     "complexity_level": complexity_level,
-                    "processing_time": "optimized",
+                    "processing_mode": "massive_scale",
+                    "unique_topics": len(set(s.section for s in processed_stories)),
                     "cache_miss": True
                 }
             )
@@ -1355,319 +2038,375 @@ async def get_ultimate_knowledge_graph(
         return knowledge_graph
         
     except Exception as e:
-        logger.error(f"Fast knowledge graph error: {e}")
-        # Quick fallback to demo
+        logger.error(f"Massive knowledge graph error: {e}")
         return await get_ultimate_demo_graph()
 
-@app.get("/api/v4/demo/ultimate")
-async def get_ultimate_demo_graph():
-    """Ultimate demo with comprehensive features showcase"""
+async def get_enhanced_massive_demo_graph() -> Dict[str, Any]:
+    """Enhanced massive demo graph with hundreds of interconnected stories"""
+    
+    # Generate a large demo dataset with diverse stories
+    demo_stories = [
+        # Business & Economy cluster (15 stories)
+        {"id": "biz1", "title": "Federal Reserve Raises Interest Rates Amid Inflation Concerns", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz2", "title": "Oil Prices Surge Following Middle East Supply Disruptions", "topic": "Business & Economy", "region": "Middle East"},
+        {"id": "biz3", "title": "Tech Giants Report Record Quarterly Earnings Despite Market Volatility", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz4", "title": "European Central Bank Maintains Aggressive Monetary Policy Stance", "topic": "Business & Economy", "region": "Europe"},
+        {"id": "biz5", "title": "Cryptocurrency Market Experiences Significant Volatility Following Regulatory News", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz6", "title": "Global Supply Chain Disruptions Impact Manufacturing Sector", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz7", "title": "Banking Sector Consolidation Accelerates with Major Merger Announcement", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz8", "title": "Commodity Prices Fluctuate on Geopolitical Uncertainty", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz9", "title": "Retail Sales Show Mixed Signals Amid Consumer Spending Changes", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz10", "title": "Energy Companies Pivot to Renewable Investment Strategies", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz11", "title": "Trade War Tensions Impact Global Economic Growth Projections", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz12", "title": "Housing Market Shows Resilience Despite Interest Rate Hikes", "topic": "Business & Economy", "region": "North America"},
+        {"id": "biz13", "title": "Insurance Industry Adapts to Climate Risk Assessment Models", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz14", "title": "Pharmaceutical Mergers Create New Market Dynamics", "topic": "Business & Economy", "region": "Global"},
+        {"id": "biz15", "title": "Labor Market Tightness Drives Wage Growth Across Industries", "topic": "Business & Economy", "region": "Global"},
+        
+        # Politics & Government cluster (15 stories)
+        {"id": "pol1", "title": "Congressional Leaders Reach Bipartisan Agreement on Infrastructure Spending", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol2", "title": "European Union Announces New Sanctions Package Against Authoritarian Regimes", "topic": "Politics & Government", "region": "Europe"},
+        {"id": "pol3", "title": "Presidential Campaign Intensifies with Major Policy Announcements", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol4", "title": "International Trade Negotiations Face New Challenges Amid Geopolitical Tensions", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol5", "title": "Supreme Court Decision on Environmental Regulations Sparks National Debate", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol6", "title": "Municipal Elections Show Shifting Political Landscape in Major Cities", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol7", "title": "Immigration Policy Reform Gains Momentum in Legislative Sessions", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol8", "title": "International Climate Summit Produces Ambitious New Commitments", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol9", "title": "Judicial Nominations Spark Constitutional Debates", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol10", "title": "Regional Trade Bloc Negotiations Enter Critical Phase", "topic": "Politics & Government", "region": "Asia Pacific"},
+        {"id": "pol11", "title": "Electoral Reform Initiatives Gain Traction Across Multiple States", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol12", "title": "Diplomatic Relations Strengthen Through Cultural Exchange Programs", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol13", "title": "Budget Negotiations Reveal Partisan Differences on Spending Priorities", "topic": "Politics & Government", "region": "North America"},
+        {"id": "pol14", "title": "International Peacekeeping Mission Receives Enhanced Mandate", "topic": "Politics & Government", "region": "Global"},
+        {"id": "pol15", "title": "Administrative Reform Package Aims to Modernize Government Services", "topic": "Politics & Government", "region": "Global"},
+        
+        # Technology cluster (20 stories)
+        {"id": "tech1", "title": "Artificial Intelligence Breakthrough Promises Revolutionary Healthcare Applications", "topic": "Technology", "region": "North America"},
+        {"id": "tech2", "title": "Major Social Media Platform Announces Comprehensive Privacy Policy Overhaul", "topic": "Technology", "region": "Global"},
+        {"id": "tech3", "title": "Quantum Computing Milestone Achieved by Leading Research Institution", "topic": "Technology", "region": "Asia Pacific"},
+        {"id": "tech4", "title": "Cybersecurity Experts Warn of Sophisticated New Ransomware Threat", "topic": "Technology", "region": "Global"},
+        {"id": "tech5", "title": "Electric Vehicle Market Expansion Accelerates with New Battery Technology", "topic": "Technology", "region": "Global"},
+        {"id": "tech6", "title": "5G Network Rollout Reaches Critical Infrastructure Milestone", "topic": "Technology", "region": "Global"},
+        {"id": "tech7", "title": "Autonomous Vehicle Testing Expands to Urban Environments", "topic": "Technology", "region": "North America"},
+        {"id": "tech8", "title": "Blockchain Technology Adoption Grows in Financial Services", "topic": "Technology", "region": "Global"},
+        {"id": "tech9", "title": "Virtual Reality Applications Transform Educational Experiences", "topic": "Technology", "region": "Global"},
+        {"id": "tech10", "title": "Cloud Computing Infrastructure Investment Reaches Record Levels", "topic": "Technology", "region": "Global"},
+        {"id": "tech11", "title": "Internet of Things Security Standards Updated for Industrial Applications", "topic": "Technology", "region": "Global"},
+        {"id": "tech12", "title": "Machine Learning Algorithms Improve Weather Prediction Accuracy", "topic": "Technology", "region": "Global"},
+        {"id": "tech13", "title": "Semiconductor Shortage Continues to Impact Global Supply Chains", "topic": "Technology", "region": "Global"},
+        {"id": "tech14", "title": "Space Technology Companies Launch New Satellite Constellations", "topic": "Technology", "region": "Global"},
+        {"id": "tech15", "title": "Robotics Innovation Transforms Manufacturing Processes", "topic": "Technology", "region": "Asia Pacific"},
+        {"id": "tech16", "title": "Digital Currency Pilot Programs Launch in Major Economies", "topic": "Technology", "region": "Global"},
+        {"id": "tech17", "title": "Augmented Reality Shopping Experiences Gain Consumer Adoption", "topic": "Technology", "region": "Global"},
+        {"id": "tech18", "title": "Biotech Companies Utilize AI for Drug Discovery Acceleration", "topic": "Technology", "region": "North America"},
+        {"id": "tech19", "title": "Smart City Initiatives Integrate Multiple Technology Platforms", "topic": "Technology", "region": "Global"},
+        {"id": "tech20", "title": "Edge Computing Solutions Address Data Processing Challenges", "topic": "Technology", "region": "Global"}
+    ]
+    
+    # Add more diverse stories across all categories (continuing the pattern)
+    additional_stories = [
+        # Environment & Climate (12 stories)
+        {"id": "env1", "title": "Climate Scientists Report Accelerating Ice Sheet Loss in Antarctica", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env2", "title": "Renewable Energy Investment Reaches Historic Highs Across Developing Nations", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env3", "title": "Major Corporation Commits to Net-Zero Carbon Emissions by 2030", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env4", "title": "Extreme Weather Events Increase Pressure for Climate Action", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env5", "title": "International Carbon Trading Market Undergoes Significant Reform", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env6", "title": "Ocean Conservation Initiative Expands Marine Protected Areas", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env7", "title": "Solar Panel Efficiency Breakthrough Accelerates Clean Energy Adoption", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env8", "title": "Deforestation Rates Decline Following International Cooperation Efforts", "topic": "Environment & Climate", "region": "Latin America"},
+        {"id": "env9", "title": "Green Building Standards Updated to Address Climate Resilience", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env10", "title": "Electric Grid Modernization Supports Renewable Energy Integration", "topic": "Environment & Climate", "region": "North America"},
+        {"id": "env11", "title": "Biodiversity Protection Measures Gain Legislative Support", "topic": "Environment & Climate", "region": "Global"},
+        {"id": "env12", "title": "Clean Water Access Projects Expand in Developing Regions", "topic": "Environment & Climate", "region": "Africa"},
+        
+        # Health & Medicine (12 stories)
+        {"id": "health1", "title": "Medical Researchers Announce Breakthrough in Alzheimer's Disease Treatment", "topic": "Health & Medicine", "region": "North America"},
+        {"id": "health2", "title": "Global Health Organization Reports Progress in Malaria Eradication Efforts", "topic": "Health & Medicine", "region": "Africa"},
+        {"id": "health3", "title": "Mental Health Services Experience Unprecedented Demand Post-Pandemic", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health4", "title": "Pharmaceutical Companies Collaborate on Rare Disease Drug Development", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health5", "title": "Telemedicine Adoption Transforms Healthcare Delivery in Rural Communities", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health6", "title": "Gene Therapy Trials Show Promise for Inherited Disorders", "topic": "Health & Medicine", "region": "Europe"},
+        {"id": "health7", "title": "Precision Medicine Approaches Personalize Cancer Treatment", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health8", "title": "Public Health Initiatives Target Preventive Care Expansion", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health9", "title": "Medical Device Innovation Improves Patient Monitoring Capabilities", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health10", "title": "Healthcare Workforce Shortages Drive Training Program Expansion", "topic": "Health & Medicine", "region": "Global"},
+        {"id": "health11", "title": "Digital Therapeutics Gain Regulatory Approval for Mental Health", "topic": "Health & Medicine", "region": "North America"},
+        {"id": "health12", "title": "Vaccine Development Pipeline Addresses Emerging Infectious Diseases", "topic": "Health & Medicine", "region": "Global"},
+        
+        # Additional categories (Sports, Culture, Education, etc.)
+        {"id": "sport1", "title": "Olympic Games Preparation Emphasizes Athlete Mental Health Support", "topic": "Sports", "region": "Global"},
+        {"id": "sport2", "title": "Professional Sports League Implements Revolutionary Sustainability Initiative", "topic": "Sports", "region": "North America"},
+        {"id": "sport3", "title": "World Cup Tournament Showcases Emerging Football Talent from Developing Nations", "topic": "Sports", "region": "Global"},
+        {"id": "sport4", "title": "Tennis Championship Features Record-Breaking Prize Money Distribution", "topic": "Sports", "region": "Europe"},
+        {"id": "sport5", "title": "Basketball League Expands International Presence with New Franchise", "topic": "Sports", "region": "Asia Pacific"},
+        
+        {"id": "culture1", "title": "Major Art Museum Opens Groundbreaking Exhibition on Digital Art", "topic": "Culture & Arts", "region": "Europe"},
+        {"id": "culture2", "title": "Film Industry Grapples with Changing Distribution Models in Streaming Era", "topic": "Culture & Arts", "region": "North America"},
+        {"id": "culture3", "title": "Music Festival Returns with Focus on Sustainability and Local Artists", "topic": "Culture & Arts", "region": "Europe"},
+        {"id": "culture4", "title": "Archaeological Discovery Reveals Ancient Civilization's Advanced Technology", "topic": "Culture & Arts", "region": "Middle East"},
+        {"id": "culture5", "title": "Literary Award Winners Reflect Diverse Voices in Contemporary Fiction", "topic": "Culture & Arts", "region": "Global"},
+        
+        {"id": "edu1", "title": "Universities Implement AI-Powered Personalized Learning Systems", "topic": "Education", "region": "North America"},
+        {"id": "edu2", "title": "Global Education Initiative Addresses Digital Divide in Remote Areas", "topic": "Education", "region": "Global"},
+        {"id": "edu3", "title": "STEM Education Programs Expand to Underserved Communities", "topic": "Education", "region": "Global"},
+        {"id": "edu4", "title": "Online Learning Platforms Transform Adult Education Opportunities", "topic": "Education", "region": "Global"},
+        
+        {"id": "security1", "title": "International Peacekeeping Forces Deploy to Address Regional Conflict", "topic": "Security & Conflict", "region": "Africa"},
+        {"id": "security2", "title": "Cybersecurity Alliance Forms to Combat State-Sponsored Hacking", "topic": "Security & Conflict", "region": "Global"},
+        {"id": "security3", "title": "Defense Ministry Announces Strategic Military Technology Investment", "topic": "Security & Conflict", "region": "Asia Pacific"},
+        {"id": "security4", "title": "Border Security Enhancement Program Receives Bipartisan Legislative Support", "topic": "Security & Conflict", "region": "North America"}
+    ]
+    
+    # Combine all demo stories
+    all_demo_stories = demo_stories + additional_stories
+    
+    # Create nodes with enhanced properties
+    nodes = []
+    topic_clusters = {}
+    geographic_clusters = {}
+    
+    for story in all_demo_stories:
+        topic = story["topic"]
+        region = story["region"]
+        
+        # Track clusters
+        if topic not in topic_clusters:
+            topic_clusters[topic] = []
+        topic_clusters[topic].append(story["id"])
+        
+        if region not in geographic_clusters:
+            geographic_clusters[region] = []
+        geographic_clusters[region].append(story["id"])
+        
+        # Create article node
+        node = {
+            "id": story["id"],
+            "type": "article",
+            "source": "guardian" if story["id"].endswith(('1', '3', '5', '7', '9')) else "nyt",
+            "title": story["title"],
+            "summary": f"Comprehensive analysis of {story['title'].lower()} with detailed insights and implications.",
+            "section": topic.split(' & ')[0].lower(),
+            "topic_cluster": topic,
+            "geographic_region": region,
+            "publication_date": datetime.now().isoformat(),
+            "url": f"https://example.com/article/{story['id']}",
+            "author": "Staff Reporter",
+            "sentiment_score": 0.1,
+            "complexity_level": 3,
+            "read_time_minutes": 4,
+            "size": max(15, min(30, len(story["title"]) // 6)),  # Smaller for massive view
+            "color": news_processor._get_simple_topic_color(topic),
+            "entities": ["Entity1", "Entity2"],
+            "categories": [topic],
+            "influence_score": 0.7
+        }
+        nodes.append(node)
+    
+    # Create topic cluster nodes
+    for topic, story_ids in topic_clusters.items():
+        if len(story_ids) >= 3:  # Create clusters with 3+ stories
+            nodes.append({
+                "id": f"topic_{topic.lower().replace(' ', '_').replace('&', 'and')}",
+                "type": "topic_cluster",
+                "title": topic,
+                "size": min(50, 25 + len(story_ids) * 2),
+                "color": news_processor._get_topic_cluster_color(topic),
+                "story_count": len(story_ids),
+                "cluster_type": "topic"
+            })
+    
+    # Create geographic cluster nodes  
+    for region, story_ids in geographic_clusters.items():
+        if len(story_ids) >= 5 and region != "Global":
+            nodes.append({
+                "id": f"geo_{region.lower().replace(' ', '_')}",
+                "type": "geographic_cluster", 
+                "title": f"📍 {region}",
+                "size": min(40, 20 + len(story_ids) * 1.5),
+                "color": news_processor._get_geographic_cluster_color(region),
+                "story_count": len(story_ids),
+                "cluster_type": "geographic"
+            })
+    
+    # Create comprehensive causal connections for massive interconnected web
+    edges = []
+    
+    # Major causal chains across the entire ecosystem
+    comprehensive_connections = [
+        # Economic causality mega-chain
+        ("biz2", "biz1", "economic_causal", 0.9, "Oil price surge drives inflation, prompting Fed rate response"),
+        ("biz1", "biz12", "economic_causal", 0.8, "Interest rate hikes impact housing market dynamics"),
+        ("biz1", "biz9", "economic_causal", 0.7, "Federal policy changes affect consumer spending patterns"),
+        ("biz3", "tech5", "economic_causal", 0.8, "Tech earnings influence electric vehicle market investment"),
+        ("biz6", "tech13", "economic_causal", 0.9, "Supply chain disruptions directly impact semiconductor availability"),
+        ("biz10", "env2", "economic_causal", 0.8, "Energy company pivots drive renewable investment growth"),
+        
+        # Political and policy interconnections
+        ("pol1", "biz1", "political_causal", 0.8, "Infrastructure spending influences monetary policy decisions"),
+        ("pol5", "env3", "political_causal", 0.9, "Supreme Court ruling drives corporate environmental commitments"),
+        ("pol8", "env5", "political_causal", 0.9, "Climate summit directly creates carbon trading reform"),
+        ("pol2", "security2", "political_causal", 0.7, "EU sanctions increase cybersecurity cooperation needs"),
+        ("pol4", "biz11", "political_causal", 0.8, "Trade negotiations directly impact economic growth projections"),
+        
+        # Technology revolution cascade
+        ("tech1", "health1", "causal", 0.9, "AI breakthroughs enable Alzheimer's treatment development"),
+        ("tech1", "health7", "causal", 0.8, "AI advances power precision medicine approaches"),
+        ("tech3", "tech14", "causal", 0.8, "Quantum computing breakthrough enables space technology advances"),
+        ("tech4", "security2", "causal", 0.8, "Ransomware threats drive international cybersecurity cooperation"),
+        ("tech5", "env10", "causal", 0.8, "Electric vehicle growth necessitates grid modernization"),
+        ("tech6", "tech19", "causal", 0.7, "5G rollout enables comprehensive smart city development"),
+        ("tech8", "tech16", "causal", 0.8, "Blockchain adoption facilitates digital currency programs"),
+        
+        # Environmental and climate web
+        ("env1", "env4", "environmental_causal", 0.9, "Antarctic ice loss directly increases extreme weather"),
+        ("env4", "biz2", "environmental_causal", 0.7, "Extreme weather disrupts oil supply chains"),
+        ("env4", "biz13", "environmental_causal", 0.8, "Climate events drive insurance industry adaptation"),
+        ("env2", "tech7", "environmental_causal", 0.7, "Renewable investment accelerates clean technology"),
+        ("env3", "biz10", "environmental_causal", 0.8, "Corporate net-zero commitments influence energy sector"),
+        
+        # Health and society connections
+        ("health3", "tech1", "social_causal", 0.7, "Mental health demand drives AI healthcare development"),
+        ("health3", "health11", "social_causal", 0.8, "Mental health needs accelerate digital therapeutics"),
+        ("health1", "tech18", "causal", 0.9, "Alzheimer's breakthrough showcases AI drug discovery"),
+        ("health5", "tech1", "causal", 0.8, "Telemedicine expansion drives AI healthcare applications"),
+        ("health12", "tech1", "causal", 0.7, "Vaccine development benefits from AI research capabilities"),
+        
+        # Cross-sector innovation chains
+        ("edu1", "tech1", "causal", 0.8, "AI education systems build on healthcare AI research"),
+        ("edu2", "tech6", "causal", 0.7, "Digital divide initiatives rely on 5G infrastructure"),
+        ("sport1", "health3", "social_causal", 0.7, "Olympic mental health focus reflects broader healthcare trends"),
+        ("culture2", "tech2", "economic_causal", 0.6, "Streaming changes influence social media policies"),
+        
+        # Security and technology interconnections
+        ("security1", "pol14", "political_causal", 0.8, "Peacekeeping deployment leads to enhanced mandate"),
+        ("security2", "tech4", "causal", 0.9, "Cybersecurity alliance formed in response to ransomware"),
+        ("security3", "tech14", "causal", 0.7, "Military tech investment supports space technology"),
+        
+        # Additional interconnected web (second-order effects)
+        ("tech9", "edu3", "causal", 0.7, "VR education transforms STEM program delivery"),
+        ("tech12", "env4", "causal", 0.8, "Improved weather prediction helps climate adaptation"),
+        ("tech15", "biz6", "causal", 0.8, "Manufacturing robotics addresses supply chain issues"),
+        ("tech17", "biz9", "economic_causal", 0.6, "AR shopping experiences change retail dynamics"),
+        ("tech19", "env9", "causal", 0.7, "Smart cities implement green building standards"),
+        
+        # Complex multi-hop causality chains
+        ("env6", "health2", "environmental_causal", 0.6, "Ocean conservation supports global health initiatives"),
+        ("env8", "env12", "environmental_causal", 0.7, "Deforestation reduction helps water access projects"),
+        ("health6", "health4", "causal", 0.8, "Gene therapy advances support rare disease collaboration"),
+        ("health8", "health10", "social_causal", 0.8, "Preventive care expansion addresses workforce shortages"),
+        
+        # Cultural and social ripples
+        ("culture1", "tech9", "social_causal", 0.6, "Digital art exhibitions inspire VR applications"),
+        ("culture3", "env3", "social_causal", 0.6, "Sustainable festivals influence corporate commitments"),
+        ("culture4", "edu3", "social_causal", 0.5, "Archaeological discoveries enhance STEM education"),
+        ("culture5", "edu2", "social_causal", 0.5, "Diverse literature supports global education"),
+        
+        # Education and workforce development
+        ("edu4", "health10", "social_causal", 0.7, "Online learning addresses healthcare training needs"),
+        ("edu1", "edu4", "causal", 0.8, "AI university systems inform adult education platforms")
+    ]
+    
+    # Create edges from all connections
+    for source, target, conn_type, strength, explanation in comprehensive_connections:
+        edges.append({
+            "source": source,
+            "target": target,
+            "type": conn_type,
+            "strength": strength,
+            "confidence": strength,
+            "explanation": explanation,
+            "keywords": ["demo", "causality", "interconnected"],
+            "evidence_score": strength,
+            "temporal_relationship": "concurrent",
+            "is_causal": True,
+            "width": max(1, min(6, strength * 8)),  # Thinner lines for massive view
+            "opacity": max(0.3, strength * 0.7),
+            "stroke_style": "solid",
+            "causal_indicator": "→"
+        })
+    
+    # Add cluster membership edges
+    for story in all_demo_stories:
+        topic_cluster_id = f"topic_{story['topic'].lower().replace(' ', '_').replace('&', 'and')}"
+        if any(node["id"] == topic_cluster_id for node in nodes):
+            edges.append({
+                "source": story["id"],
+                "target": topic_cluster_id,
+                "type": "belongs_to_topic_cluster",
+                "strength": 0.2,
+                "width": 1,
+                "opacity": 0.1,
+                "stroke_style": "dotted"
+            })
+        
+        region = story["region"]
+        geo_cluster_id = f"geo_{region.lower().replace(' ', '_')}"
+        if any(node["id"] == geo_cluster_id for node in nodes):
+            edges.append({
+                "source": story["id"], 
+                "target": geo_cluster_id,
+                "type": "belongs_to_geographic_cluster",
+                "strength": 0.15,
+                "width": 1,
+                "opacity": 0.08,
+                "stroke_style": "dotted"
+            })
+    
+    logger.info(f"Generated massive demo graph: {len(nodes)} nodes, {len(edges)} edges")
     
     return {
-        "nodes": [
-            {
-                "id": "ultimate-guardian-climate",
-                "type": "article",
-                "source": "guardian",
-                "title": "Global Climate Summit Reaches Breakthrough Agreement on Carbon Markets",
-                "summary": "World leaders at COP29 have reached a landmark agreement on international carbon trading mechanisms, establishing new frameworks for global climate finance and technology transfer that could accelerate decarbonization efforts worldwide.",
-                "lede": "The most significant climate breakthrough in decades has emerged from heated negotiations, as 195 countries agree on revolutionary carbon market reforms.",
-                "nutgraf": "This agreement fundamentally reshapes how nations can collaborate on climate action, creating new economic incentives for rapid decarbonization while establishing strict accountability mechanisms for international climate finance.",
-                "section": "Environment",
-                "publication_date": "2025-08-02T08:00:00Z",
-                "url": "https://example.com/climate-breakthrough",
-                "author": "Environmental Correspondent",
-                "sentiment_score": 0.7,
-                "complexity_level": 4,
-                "read_time_minutes": 8,
-                "size": 35,
-                "color": "#27ae60",
-                "entities": ["United Nations", "Carbon Markets", "Climate Finance", "COP29"],
-                "categories": ["international cooperation", "environmental policy", "economic instruments"],
-                "engagement_preview": "🌍 HISTORIC: Climate summit delivers game-changing carbon market deal! 195 countries agree on revolutionary approach to global decarbonization. This changes everything for climate finance 🚀 #ClimateBreakthrough #COP29",
-                "influence_metrics": {
-                    "centrality_score": 0.95,
-                    "reach_potential": 150,
-                    "connection_density": 0.85
-                }
-            },
-            {
-                "id": "ultimate-nyt-fed-response",
-                "type": "article",
-                "source": "nyt",
-                "title": "Federal Reserve Weighs Climate Risk in Interest Rate Decision Making",
-                "summary": "The Federal Reserve is incorporating climate-related financial risks into its monetary policy framework, signaling a major shift in how environmental factors influence US interest rates and financial stability assessments.",
-                "lede": "Federal Reserve Chair Jerome Powell announced unprecedented integration of climate risk analysis into monetary policy decisions, marking a historic shift in central banking philosophy.",
-                "nutgraf": "This policy evolution reflects growing recognition that climate change poses systemic risks to financial stability, potentially affecting everything from inflation expectations to asset valuations and requiring new analytical frameworks for monetary policy.",
-                "section": "Business",
-                "publication_date": "2025-08-02T10:30:00Z",
-                "url": "https://example.com/fed-climate-policy",
-                "author": "Federal Reserve Correspondent",
-                "sentiment_score": 0.1,
-                "complexity_level": 5,
-                "read_time_minutes": 12,
-                "size": 38,
-                "color": "#2c3e50",
-                "entities": ["Federal Reserve", "Jerome Powell", "Climate Risk", "Monetary Policy"],
-                "categories": ["central banking", "environmental economics", "financial stability"],
-                "engagement_preview": "🏦 UNPRECEDENTED: Fed integrates climate risk into interest rate decisions! Powell's historic announcement reshapes monetary policy forever. Markets react as environmental factors become core to Fed policy 📊 #FederalReserve #ClimateFinance",
-                "influence_metrics": {
-                    "centrality_score": 0.88,
-                    "reach_potential": 200,
-                    "connection_density": 0.92
-                }
-            },
-            {
-                "id": "ultimate-guardian-tech-innovation",
-                "type": "article",
-                "source": "guardian", 
-                "title": "AI Breakthrough Accelerates Climate Technology Development",
-                "summary": "Revolutionary artificial intelligence algorithms are dramatically accelerating the development of clean energy technologies, with new AI models reducing renewable energy research timelines from decades to months.",
-                "lede": "Artificial intelligence has achieved a breakthrough that could revolutionize clean energy development, with AI systems now designing more efficient solar panels and batteries in record time.",
-                "nutgraf": "This convergence of AI and climate technology represents a potential inflection point in the global energy transition, offering hope that technological innovation can outpace climate change if properly scaled and deployed.",
-                "section": "Technology",
-                "publication_date": "2025-08-02T14:15:00Z",
-                "url": "https://example.com/ai-climate-tech",
-                "author": "Technology Reporter",
-                "sentiment_score": 0.8,
-                "complexity_level": 3,
-                "read_time_minutes": 6,
-                "size": 30,
-                "color": "#9b59b6",
-                "entities": ["Artificial Intelligence", "Clean Energy", "Solar Technology", "Battery Innovation"],
-                "categories": ["technology innovation", "renewable energy", "artificial intelligence"],
-                "engagement_preview": "🤖⚡ BREAKTHROUGH: AI revolutionizes clean energy development! New algorithms design better solar panels & batteries in MONTHS, not decades. The future of renewable energy just accelerated! 🚀 #AI #CleanEnergy #Innovation",
-                "influence_metrics": {
-                    "centrality_score": 0.76,
-                    "reach_potential": 120,
-                    "connection_density": 0.68
-                }
-            },
-            # Source nodes
-            {
-                "id": "source_guardian",
-                "type": "source",
-                "title": "GUARDIAN",
-                "size": 50,
-                "color": "#3498db"
-            },
-            {
-                "id": "source_nyt",
-                "type": "source",
-                "title": "NYT",
-                "size": 50,
-                "color": "#2c3e50"
-            },
-            # Section nodes
-            {
-                "id": "section_environment",
-                "type": "section",
-                "title": "Environment",
-                "size": 40,
-                "color": "#27ae60"
-            },
-            {
-                "id": "section_business",
-                "type": "section", 
-                "title": "Business",
-                "size": 40,
-                "color": "#f39c12"
-            },
-            {
-                "id": "section_technology",
-                "type": "section",
-                "title": "Technology",
-                "size": 40,
-                "color": "#9b59b6"
-            }
-        ],
-        "edges": [
-            # Ultimate story connections
-            {
-                "source": "ultimate-guardian-climate",
-                "target": "ultimate-nyt-fed-response",
-                "type": "economic",
-                "strength": 0.92,
-                "confidence": 0.95,
-                "explanation": "The climate agreement creates new economic frameworks that directly influence Federal Reserve policy considerations, as carbon markets affect inflation, investment flows, and financial stability in ways that require monetary policy responses.",
-                "keywords": ["carbon markets", "monetary policy", "financial stability", "climate economics"],
-                "evidence_score": 0.91,
-                "width": 11,
-                "opacity": 0.95,
-                "temporal_relationship": "causation"
-            },
-            {
-                "source": "ultimate-nyt-fed-response",
-                "target": "ultimate-guardian-tech-innovation",
-                "type": "causal",
-                "strength": 0.78,
-                "confidence": 0.85,
-                "explanation": "Fed's integration of climate risk into monetary policy creates new investment incentives for clean technology innovation, as climate-adjusted interest rates favor environmentally sustainable investments and accelerate AI-driven clean energy development.",
-                "keywords": ["investment incentives", "clean technology", "monetary policy", "innovation finance"],
-                "evidence_score": 0.82,
-                "width": 9,
-                "opacity": 0.88,
-                "temporal_relationship": "causation"
-            },
-            {
-                "source": "ultimate-guardian-climate",
-                "target": "ultimate-guardian-tech-innovation",
-                "type": "thematic",
-                "strength": 0.85,
-                "confidence": 0.89,
-                "explanation": "Both stories represent different facets of accelerated global climate action - policy frameworks enabling market mechanisms while technological breakthroughs provide the tools for rapid implementation of climate solutions.",
-                "keywords": ["climate action", "policy implementation", "technological acceleration", "global coordination"],
-                "evidence_score": 0.87,
-                "width": 10,
-                "opacity": 0.92,
-                "temporal_relationship": "concurrent"
-            },
-            # Source connections
-            {
-                "source": "ultimate-guardian-climate",
-                "target": "source_guardian",
-                "type": "belongs_to_source",
-                "strength": 1.0,
-                "width": 3,
-                "opacity": 0.4
-            },
-            {
-                "source": "ultimate-nyt-fed-response",
-                "target": "source_nyt",
-                "type": "belongs_to_source",
-                "strength": 1.0,
-                "width": 3,
-                "opacity": 0.4
-            },
-            {
-                "source": "ultimate-guardian-tech-innovation",
-                "target": "source_guardian",
-                "type": "belongs_to_source",
-                "strength": 1.0,
-                "width": 3,
-                "opacity": 0.4
-            },
-            # Section connections
-            {
-                "source": "ultimate-guardian-climate",
-                "target": "section_environment",
-                "type": "belongs_to_section",
-                "strength": 1.0,
-                "width": 2,
-                "opacity": 0.3
-            },
-            {
-                "source": "ultimate-nyt-fed-response",
-                "target": "section_business",
-                "type": "belongs_to_section",
-                "strength": 1.0,
-                "width": 2,
-                "opacity": 0.3
-            },
-            {
-                "source": "ultimate-guardian-tech-innovation",
-                "target": "section_technology",
-                "type": "belongs_to_section",
-                "strength": 1.0,
-                "width": 2,
-                "opacity": 0.3
-            }
-        ],
+        "nodes": nodes,
+        "edges": edges,
         "metadata": {
-            "total_articles": 3,
-            "total_sections": 3,
-            "total_sources": 2,
-            "total_connections": 3,
+            "total_articles": len([n for n in nodes if n["type"] == "article"]),
+            "total_topic_clusters": len([n for n in nodes if n["type"] == "topic_cluster"]),
+            "total_geographic_clusters": len([n for n in nodes if n["type"] == "geographic_cluster"]),
+            "total_causal_connections": len([e for e in edges if e.get("is_causal", False)]),
+            "total_all_connections": len([e for e in edges if not e["type"].startswith("belongs_to")]),
             "generated_at": datetime.now().isoformat(),
-            "ai_analysis_enabled": True,
             "demo_mode": True,
-            "version": "4.0.0-ultimate",
+            "processing_mode": "massive_demo",
+            "topics_distribution": {topic: len(story_ids) for topic, story_ids in topic_clusters.items()},
+            "geographic_distribution": {region: len(story_ids) for region, story_ids in geographic_clusters.items()},
             "advanced_features": {
-                "multi_source": True,
-                "geographic_analysis": True,
-                "temporal_analysis": True,
-                "sentiment_analysis": True,
-                "complexity_adaptation": True,
-                "confidence_scoring": True,
-                "influence_metrics": True,
-                "real_time_analytics": True,
-                "websocket_support": True
+                "massive_scale": True,
+                "comprehensive_interconnections": True,
+                "topic_clustering": True,
+                "geographic_clustering": True,
+                "causal_analysis": True,
+                "cross_source_analysis": True,
+                "multi_hop_causality": True
             },
-            "trending_topics": [
-                {
-                    "topic": "climate policy breakthrough",
-                    "score": 0.95,
-                    "growth_rate": 0.78,
-                    "article_count": 2,
-                    "sentiment_trend": [0.3, 0.6, 0.8]
-                },
-                {
-                    "topic": "federal reserve climate integration",
-                    "score": 0.88,
-                    "growth_rate": 0.65,
-                    "article_count": 1,
-                    "sentiment_trend": [0.1, 0.2, 0.1]
-                },
-                {
-                    "topic": "ai clean energy acceleration",
-                    "score": 0.82,
-                    "growth_rate": 0.92,
-                    "article_count": 1,
-                    "sentiment_trend": [0.7, 0.8, 0.9]
-                }
-            ],
-            "geographic_insights": {
-                "story_locations": {
-                    "ultimate-guardian-climate": [{"name": "Global", "region": "International"}],
-                    "ultimate-nyt-fed-response": [{"name": "Washington DC", "region": "North America"}],
-                    "ultimate-guardian-tech-innovation": [{"name": "Multiple", "region": "Global"}]
-                },
-                "regional_clusters": {
-                    "International": ["ultimate-guardian-climate"],
-                    "North America": ["ultimate-nyt-fed-response"],
-                    "Global": ["ultimate-guardian-tech-innovation"]
-                },
-                "global_hotspots": [
-                    {
-                        "region": "Global",
-                        "story_count": 2,
-                        "intensity": 0.8,
-                        "stories": ["ultimate-guardian-climate", "ultimate-guardian-tech-innovation"]
-                    }
-                ]
-            },
-            "temporal_analysis": {
-                "events": [
-                    {
-                        "id": "ultimate-guardian-climate",
-                        "timestamp": "2025-08-02T08:00:00Z",
-                        "type": "breaking",
-                        "importance": 0.95
-                    },
-                    {
-                        "id": "ultimate-nyt-fed-response", 
-                        "timestamp": "2025-08-02T10:30:00Z",
-                        "type": "analysis",
-                        "importance": 0.88
-                    },
-                    {
-                        "id": "ultimate-guardian-tech-innovation",
-                        "timestamp": "2025-08-02T14:15:00Z",
-                        "type": "news",
-                        "importance": 0.82
-                    }
-                ],
-                "development_stages": {
-                    "initial_reports": ["ultimate-guardian-climate"],
-                    "developing_coverage": ["ultimate-nyt-fed-response"],
-                    "analysis_phase": ["ultimate-guardian-tech-innovation"],
-                    "total_duration_hours": 6.25,
-                    "coverage_intensity": 0.48,
-                    "development_speed": "rapid"
-                }
+            "scale_metrics": {
+                "stories_count": len(all_demo_stories),
+                "connections_count": len(comprehensive_connections),
+                "topic_categories": len(topic_clusters),
+                "geographic_regions": len(geographic_clusters),
+                "causality_chains": "multi_level"
             }
         }
     }
+
+@app.get("/api/v4/demo/ultimate")
+async def get_ultimate_demo_graph():
+    """Massive demo with hundreds of interconnected stories"""
+    
+    try:
+        return await get_enhanced_massive_demo_graph()
+    except Exception as e:
+        logger.error(f"Massive demo error: {e}")
+        # Fallback to simpler demo if massive fails
+        return {
+            "nodes": [
+                {
+                    "id": "demo-1", "type": "article", "source": "guardian",
+                    "title": "Sample News Story", "summary": "Demo content",
+                    "size": 25, "color": "#3498db"
+                }
+            ],
+            "edges": [],
+            "metadata": {"demo_mode": True, "total_articles": 1}
+        }
 
 @app.get("/api/v4/trends/real-time")
 async def get_real_time_trends(session_id: str = Query(default_factory=lambda: str(uuid.uuid4()))):
@@ -2755,12 +3494,12 @@ async def get_advanced_knowledge_graph(
             raw_stories.extend(nyt_stories)
         
         # Process stories
-        processed_stories = await news_processor.process_multi_source_stories(
+        processed_stories = await news_processor.process_massive_story_collection(
             guardian_stories, nyt_stories, user_prefs
         )
         
         # Create advanced knowledge graph
-        knowledge_graph = await news_processor.create_advanced_knowledge_graph(
+        knowledge_graph = await news_processor.create_massive_knowledge_graph(
             processed_stories, raw_stories, user_prefs
         )
         
